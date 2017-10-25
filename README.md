@@ -15,4 +15,9 @@ Requirements
 
 * SDL2 SDL2_image SDL2_ttf SDL2_gfx
 * for linux : sdl2 gfx bindings (opengl, X11 or Pi libs)
+* cmake
 
+# Build
+
+```cmake .
+make && make install```
