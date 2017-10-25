@@ -9,7 +9,7 @@ set(MACOSX_RPATH on)
 set (CMAKE_INSTALL_PREFIX "" CACHE PATH "default install path" FORCE )
 
 # Compile video support (requires libffmpeg)
-set(WITH_VIDEO on)
+set(WITH_VIDEO off)
 
 # We want to gently wait for events or poll agressivly (more performant)
 set(WITH_KMS_DEMO off)
