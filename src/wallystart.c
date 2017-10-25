@@ -160,6 +160,17 @@ bool loadSDL()
     }
     SDL_ShowCursor( 0 );
 
+    if(!SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY,"2"))
+        SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY,"1");
+
+#ifndef RASPBERRY
+#ifndef DARWIN
+    // Intel X11
+    SDL_SetHint(SDL_HINT_VIDEO_X11_XRANDR,"1");
+    SDL_SetHint(SDL_HINT_VIDEO_X11_XRANDR,"0");
+#endif
+#endif
+
 #ifdef DARWIN
     window = SDL_CreateWindow("wallyd", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1440, 720, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
 #else
@@ -190,7 +201,7 @@ bool showTexture(SDL_Texture *tex1, int rot){
       SDL_Texture *tex2;
       if(logStr) {
          tex2 = renderLog(logStr,&r.w, &r.h);
-         r.x = 1;
+         r.x = 0;
          r.y = h - r.h;
       }
       if(rot == 0){

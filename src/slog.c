@@ -386,7 +386,7 @@ void eslog(const char *_srcfile, int line, int level, int flag, const char *msg,
               if (level > INFO) {
                 sprintf(prints, "%s:%d] %s", srcfile, line, string);
                 int thr_id = (unsigned int)pthread_self();
-                printf("[%s][T:%p][%s\n", strclr(color, alarm), thr_id, slog_get_short(&mdate, "%s",prints));
+                printf("[%s][T:%x][%s\n", strclr(color, alarm), thr_id, slog_get_short(&mdate, "%s",prints));
               } else {
                 sprintf(prints, "%s:%d] %s", srcfile, line, string);
                 printf("[%s][%s\n", strclr(color, alarm), slog_get(&mdate, "%s",prints));
