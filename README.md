@@ -21,5 +21,4 @@ Requirements
 
 ```
 cmake .
-make && make install
-```
+make && make install```
