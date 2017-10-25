@@ -1,0 +1,74 @@
+#!/bin/sh
+
+BASEPATH=/opt/wallyd
+
+start() {
+
+	test -d /etc/wallyd.d/images && mv /etc/wallyd.d/images /etc/wallyd.d/images.orig
+	test -e /etc/wallyd.d/images || ln -s /opt/wallyd/etc/wallyd.d/images /etc/wallyd.d/images
+	test -d /etc/wallyd.d/fonts && mv /etc/wallyd.d/fonts /etc/wallyd.d/fonts.orig
+	test -e /etc/wallyd.d/fonts || ln -s /opt/wallyd/etc/wallyd.d/fonts /etc/wallyd.d/fonts
+
+	#	Link and replace wally media files by oem files
+	LINKPATH=/wally/oem/fonts
+	if [ -e $LINKPATH ]; then
+		cd /opt/wallyd/etc/wallyd.d/fonts
+		for i in `ls $LINKPATH`; do
+			test -f $i && rm -f $i
+			ln -s $LINKPATH/$i
+		done
+	fi
+
+	LINKPATH=/wally/oem/screensaver
+	test -d $LINKPATH || mkdir $LINKPATH
+	cd /opt/wallyd/demo
+	for i in `ls $LINKPATH`; do
+	    test -f $i && rm -f $i
+	    ln -s $LINKPATH/$i
+	done
+
+	LINKPATH=/wally/oem/images
+	if [ -e $LINKPATH ]; then
+		cd /opt/wallyd/etc/wallyd.d/images
+		for i in `ls $LINKPATH`; do
+			test -f $i && rm -f $i
+			ln -s $LINKPATH/$i
+		done
+	fi
+
+    if [ -e /usr/bin/X ]; then
+        /usr/bin/X -nocursor &
+        export DISPLAY=:0
+        echo "export DISPLAY=:0" >>/wally/flags
+        . /wally/flags
+    fi
+
+	if [ -e /opt/oem/wallystart.conf ]; then
+		(cd / ; screen -dmS wallystart /bin/wallystart /opt/oem/wallystart.conf &)
+	else
+		(cd / ; screen -dmS wallystart /bin/wallystart &)
+	fi
+}
+
+stop() {
+	echo ok
+}
+
+case "$1" in
+  start)
+        start
+        ;;
+  stop)
+        stop
+        ;;
+  restart|reload)
+        stop
+        start
+        ;;
+  *)
+        echo "Usage: $0 {start|stop|restart}"
+        exit 1
+esac
+
+exit $?
+

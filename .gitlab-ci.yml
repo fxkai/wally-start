@@ -1,0 +1,159 @@
+stages:
+  - init
+  - test
+  - post-test
+  - build&deploy
+  - cleanup
+  - notify
+
+.utilsVars: &utilsVars
+  BUILDSCRIPTS: ${UTILS}/buildscripts
+  DOCKERFILES: ${UTILS}/dockerfiles
+
+.dockerVars: &dockerVars
+  CONTAINER_TEST_IMAGE: ${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_NAME}
+  CONTAINER_STAGE_IMAGE: ${CI_REGISTRY_IMAGE}:latest-stage
+  CONTAINER_LIVE_IMAGE: ${CI_REGISTRY_IMAGE}:latest-live
+  # DOCKER_DRIVER: overlay
+  UTILS: /data/wallaby-ci
+  <<: *utilsVars
+
+# Clone wallaby-ci repo to get buildscripts
+.utils: &utils |
+  # Run ssh-agent (inside the build environment)
+  eval $(ssh-agent -s)
+
+  # Add the SSH key stored in SSH_PRIVATE_KEY variable to the agent store
+  ssh-add /.ssh/id_rsa
+
+  # For Docker builds disable host key checking. Be aware that by adding that
+  # you are suspectible to man-in-the-middle attacks.
+  # WARNING: Use this only with the Docker executor, if you use it with shell
+  # you will overwrite your user's SSH config.
+  mkdir -p ~/.ssh
+  echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+
+  rm -rf $UTILS && mkdir -p $UTILS && git clone git@git.freshx.de:Wallaby-CI/wallaby-ci.git $UTILS
+
+.isProduct: &isProduct bash ${BUILDSCRIPTS}/isProduct.sh
+.loginRegistry: &loginRegistry bash ${BUILDSCRIPTS}/loginRegistry.sh
+.prepareDocker: &prepareDocker bash ${BUILDSCRIPTS}/prepareDocker.sh
+
+.docker: &docker
+  variables:
+    <<: *dockerVars
+  before_script:
+    - *utils
+    - *prepareDocker
+  tags:
+    - docker
+
+build:nodejs:
+  <<: *docker
+  stage: init
+  script:
+    - bash ${BUILDSCRIPTS}/${CI_JOB_NAME}.sh
+
+test:nodeunit:
+  <<: *docker
+  stage: test
+  script:
+    - bash ${BUILDSCRIPTS}/${CI_JOB_NAME}.sh
+
+test:lint:
+  <<: *docker
+  stage: test
+  script:
+    - bash ${BUILDSCRIPTS}/${CI_JOB_NAME}.sh
+  artifacts:
+    when: on_failure
+    expire_in: 30 days
+    paths:
+      - artifacts/
+
+post-test:stage-image:
+  <<: *docker
+  stage: post-test
+  script:
+    - *isProduct
+    - if [[ $IS_PRODUCT ]]; then docker pull $CONTAINER_TEST_IMAGE; fi
+    - if [[ $IS_PRODUCT ]]; then docker tag $CONTAINER_TEST_IMAGE $CONTAINER_STAGE_IMAGE; fi
+    - if [[ $IS_PRODUCT ]]; then docker push $CONTAINER_STAGE_IMAGE; fi
+  only:
+    - master
+
+post-test:live-image:
+  <<: *docker
+  stage: post-test
+  script:
+    - *isProduct
+    - if [[ $IS_PRODUCT ]]; then docker pull $CONTAINER_TEST_IMAGE; fi
+    - if [[ $IS_PRODUCT ]]; then docker tag $CONTAINER_TEST_IMAGE $CONTAINER_LIVE_IMAGE; fi
+    - if [[ $IS_PRODUCT ]]; then docker push $CONTAINER_LIVE_IMAGE; fi
+  only:
+    - master
+
+# TODO in das cd-tool verschieben!
+# deploy:staging:
+#   <<: *docker
+#   stage: build&deploy
+#   variables:
+#     <<: *dockerVars
+#     <<: *utilsVars
+#   before_script:
+#     - *utils
+#     - *prepareDocker
+#     - *loginRegistry
+#   script:
+#     - *isProduct
+#     - if [[ $IS_PRODUCT ]]; then bash ${BUILDSCRIPTS}/${CI_JOB_NAME}.sh; fi
+#   only:
+#     - master
+#   environment:
+#     name: staging
+#     url: http://www.freshx.de
+
+deploy:wallabycd:
+  stage: build&deploy
+  script:
+    - export ANDROID_HOME=/Users/freshx/Library/Android/sdk/
+    - node /data/cd/wallaby-cd/app.js
+  tags: 
+    - mac
+
+# TODO in cd-tool verschieben, aber in separatem job ausführen (wegen "when: manual")
+# deploy:production:
+#   stage: build&deploy
+#   variables:
+#     <<: *dockerVars
+#     <<: *utilsVars
+#   before_script:
+#     - *utils
+#     - *loginRegistry
+#   script:
+#     - *isProduct
+#     - if [[ $IS_PRODUCT ]]; then bash ${BUILDSCRIPTS}/${CI_JOB_NAME}.sh; fi
+#   tags:
+#     - ssh
+#   only:
+#     - master
+#   when: manual
+#   environment:
+#     name: production
+#     url: http://www.freshx.de
+
+cleanup:docker:
+  <<: *docker
+  stage: cleanup
+  script:
+    - bash ${BUILDSCRIPTS}/${CI_JOB_NAME}.sh
+  when: always
+
+
+notify:rocket.chat:
+  stage: notify
+  script: >-
+    curl -X POST --data-urlencode "payload={\"username\":\"gitlab\",\"text\":\"Build on \`$CI_COMMIT_REF_NAME\` failed! Commit \`$(git log -1 --oneline)\` See <$CI_PROJECT_URL/commit/$CI_COMMIT_SHA/pipelines>\"}" $CI_ROCKETCHAT_WEBHOOK_URL
+  when: on_failure
+  tags:
+    - chat
