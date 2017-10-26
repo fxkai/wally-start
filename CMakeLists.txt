@@ -63,7 +63,6 @@ string(TIMESTAMP CMAKE_BUILD_DATE "%Y-%m-%d")
 set(BIN_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/bin" CACHE STRING "Directory where lib will install")
 set(LIB_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/lib${LIB_SUFFIX}" CACHE STRING "Directory where lib will install")
 set(DATA_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/etc" CACHE PATH "The directory the configs are installed in")
-set(PLUGIN_INSTALL_DIR "${LIB_INSTALL_DIR}/wallyd" CACHE PATH "The directory the plugins are installed in")
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD") 
     set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -DDARWIN")

@@ -5,9 +5,9 @@ fadein 9000 /wally/oem/images/fadein1.png
 sleep 1
 fadeover 3000 /wally/oem/images/fadeover1.png
 color ffffff
-fadeover 100 /wally/oem/images/fadeover2.png
+fadeover 1000 /wally/oem/images/fadeover2.png
 fadeover 1000 /wally/oem/images/fadeover3.png
 color ffffff
-fadeloop 10 100 /wally/oem/images/fadeover3.png /wally/oem/images/fadeover4.png
+fadeloop 10 1000 /wally/oem/images/fadeover3.png /wally/oem/images/fadeover4.png
 fadeover 1000 /wally/oem/images/fadeover3.png
 log WallyTV2.1 Base system ready.

@@ -6,9 +6,9 @@ sleep 1
 fadeover 3000 /wally/oem/images/logo-dark-fx.png
 #fadeover 5000 /wally/oem/images/fxlogo-white.png
 color ffffff
-fadeover 100 /wally/oem/images/fxframe-bw.png
+fadeover 1000 /wally/oem/images/fxframe-bw.png
 fadeover 1000 /wally/oem/images/wally2.0-1920x1080-bw.png
 color ffffff
-fadeloop 10 100 /wally/oem/images/wally2.0-1920x1080-bw.png /wally/oem/images/wally2.0-1920x1080-bw-recovery.png
+fadeloop 10 1000 /wally/oem/images/wally2.0-1920x1080-bw.png /wally/oem/images/wally2.0-1920x1080-bw-recovery.png
 fadeover 1000 /wally/oem/images/wally2.0-1920x1080-bw.png
 log WallyTV2.1 Base system ready.

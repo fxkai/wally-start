@@ -14,7 +14,7 @@
 #include "slog.h"
 #include "autoversion.h"
 
-#define VERSION "0.21"
+#define VERSION "0.3"
 #define BASE "."
 #define FONT "/etc/wallyd.d/fonts/Cairo-Regular.ttf"
 #define START WALLYD_CONFDIR"/wallystart.conf"
