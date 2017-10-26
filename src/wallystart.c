@@ -379,7 +379,7 @@ bool processCommand(char *buf)
                 slog(DEBUG,LOG_CORE,"Fadein %s with delay %u",file, delay);
                 if(file && delay) {
                     t1 = loadImage(file);
-                    fadeImage(t1, rot, false, delay);
+                    fadeImage(t1, rot, false, delay * 1000);
                 } else {
                     slog(DEBUG,LOG_CORE,"fadein <delay> <file>");
                 }
@@ -391,7 +391,7 @@ bool processCommand(char *buf)
                 slog(DEBUG,LOG_CORE,"Fadeover %s with delay %u",file, delay);
                 if(file && delay) {
                     t2 = loadImage(file);
-                    fadeOver(t1, t2, rot, delay);
+                    fadeOver(t1, t2, rot, delay * 1000);
                     SDL_DestroyTexture(t1);
                     t1 = t2;
                 } else {
@@ -410,10 +410,10 @@ bool processCommand(char *buf)
                     t1 = loadImage(fileA);
                     t2 = loadImage(fileB);
                     for(i = 0; i < loop; i++){
-                        fadeOver(t1, t2, rot, delay);
-                        fadeOver(t2, t1, rot, delay);
+                        fadeOver(t1, t2, rot, delay * 1000);
+                        fadeOver(t2, t1, rot, delay * 1000);
                     }
-                    fadeOver(t1, t2, rot, delay);
+                    fadeOver(t1, t2, rot, delay * 1000);
                     SDL_DestroyTexture(t1);
                     t1 = t2;
                 } else {
@@ -428,7 +428,7 @@ bool processCommand(char *buf)
                 }
                 slog(DEBUG,LOG_CORE,"Fadeout with delay %u",delay);
                 if(delay) {
-                    fadeImage(t1, rot, true, delay);
+                    fadeImage(t1, rot, true, delay * 1000);
                 } else {
                     slog(DEBUG,LOG_CORE,"fadeout <delay>");
                 }
