@@ -27,6 +27,7 @@ extern int bindPort;
 extern bool startupDone;
 
 bool loadSDL();
+bool dumpSDLInfo();
 bool loadFont(char *file, int size);
 bool fadeImage(SDL_Texture *text, int rot, bool reverse, long delay);
 bool showTexture(SDL_Texture *text, int rot);

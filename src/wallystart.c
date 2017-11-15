@@ -57,8 +57,8 @@ int main( int argc, char* argv[] )
     slog(INFO,LOG_TEXTURE,"Initializing broadcom hardware");
 #endif
 #ifndef DARWIN
-//    slog(INFO,LOG_TEXTURE,"Enable SDL2 verbose logging");
-//    SDL_LogSetAllPriority(SDL_LOG_PRIORITY_VERBOSE);
+    slog(INFO,LOG_TEXTURE,"Enable SDL2 verbose logging");
+    SDL_LogSetAllPriority(SDL_LOG_PRIORITY_VERBOSE);
 #endif
 
     dumpModes();
@@ -66,6 +66,9 @@ int main( int argc, char* argv[] )
     if(!loadSDL()){
         slog(ERROR,LOG_CORE,"Failed to initialize SDL. Exit");
     }
+
+    dumpSDLInfo();
+
     if( h > 0) {
       fontSize = h / 56;
     }
@@ -110,6 +113,51 @@ int main( int argc, char* argv[] )
     }
     closeSDL();
     return 0;
+}
+
+bool dumpSDLInfo()
+{
+	int i;
+        printf("\nCheck SDL Window enabled flags:\n"); 
+        int flags = SDL_GetWindowFlags(window);
+        printf("    SDL_WINDOW_FULLSCREEN    [%c]\n", (flags & SDL_WINDOW_FULLSCREEN) ? 'X' : ' '); 
+        printf("    SDL_WINDOW_OPENGL        [%c]\n", (flags & SDL_WINDOW_OPENGL) ? 'X' : ' '); 
+        printf("    SDL_WINDOW_SHOWN         [%c]\n", (flags & SDL_WINDOW_SHOWN) ? 'X' : ' '); 
+        printf("    SDL_WINDOW_HIDDEN        [%c]\n", (flags & SDL_WINDOW_HIDDEN) ? 'X' : ' '); 
+        printf("    SDL_WINDOW_BORDERLESS    [%c]\n", (flags & SDL_WINDOW_BORDERLESS) ? 'X' : ' '); 
+        printf("    SDL_WINDOW_RESIZABLE     [%c]\n", (flags & SDL_WINDOW_RESIZABLE) ? 'X' : ' '); 
+        printf("    SDL_WINDOW_MINIMIZED     [%c]\n", (flags & SDL_WINDOW_MINIMIZED) ? 'X' : ' '); 
+        printf("    SDL_WINDOW_MAXIMIZED     [%c]\n", (flags & SDL_WINDOW_MAXIMIZED) ? 'X' : ' '); 
+        printf("    SDL_WINDOW_INPUT_GRABBED [%c]\n", (flags & SDL_WINDOW_INPUT_GRABBED) ? 'X' : ' '); 
+        printf("    SDL_WINDOW_INPUT_FOCUS   [%c]\n", (flags & SDL_WINDOW_INPUT_FOCUS) ? 'X' : ' '); 
+        printf("    SDL_WINDOW_MOUSE_FOCUS   [%c]\n", (flags & SDL_WINDOW_MOUSE_FOCUS) ? 'X' : ' '); 
+        printf("    SDL_WINDOW_FOREIGN       [%c]\n", (flags & SDL_WINDOW_FOREIGN) ? 'X' : ' '); 
+
+        // Allocate a renderer info struct 
+        SDL_RendererInfo *rend_info = (SDL_RendererInfo *) malloc(sizeof(SDL_RendererInfo)); 
+        if (!rend_info) { 
+                slog(WARN, LOG_CORE, "Couldn't allocate memory for the renderer info data structure\n"); 
+        } 
+        // Print the list of the available renderers 
+        printf("\nAvailable 2D rendering drivers:\n"); 
+        for (i = 0; i < SDL_GetNumRenderDrivers(); i++) { 
+                if (SDL_GetRenderDriverInfo(i, rend_info) < 0) { 
+                        slog(WARN, LOG_CORE, "Couldn't get SDL 2D render driver information: %s\n", SDL_GetError()); 
+                } 
+                printf("%2d: %s\n", i, rend_info->name); 
+                printf("    SDL_RENDERER_SOFTWARE     [%c]\n", (rend_info->flags & SDL_RENDERER_SOFTWARE) ? 'X' : ' '); 
+                printf("    SDL_RENDERER_ACCELERATED  [%c]\n", (rend_info->flags & SDL_RENDERER_ACCELERATED) ? 'X' : ' '); 
+                printf("    SDL_RENDERER_PRESENTVSYNC [%c]\n", (rend_info->flags & SDL_RENDERER_PRESENTVSYNC) ? 'X' : ' '); 
+        } 
+
+        // Print the name of the current rendering driver 
+        if (SDL_GetRendererInfo(renderer, rend_info) < 0) { 
+                slog(WARN, LOG_CORE, "Couldn't get SDL 2D rendering driver information: %s\n", SDL_GetError()); 
+        } 
+        printf("Rendering driver in use: %s\n", rend_info->name); 
+        printf("    SDL_RENDERER_SOFTWARE     [%c]\n", (rend_info->flags & SDL_RENDERER_SOFTWARE) ? 'X' : ' '); 
+        printf("    SDL_RENDERER_ACCELERATED  [%c]\n", (rend_info->flags & SDL_RENDERER_ACCELERATED) ? 'X' : ' '); 
+        printf("    SDL_RENDERER_PRESENTVSYNC [%c]\n", (rend_info->flags & SDL_RENDERER_PRESENTVSYNC) ? 'X' : ' '); 
 }
 
 bool dumpModes()
@@ -160,21 +208,10 @@ bool loadSDL()
     }
     SDL_ShowCursor( 0 );
 
-    if(!SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY,"2"))
-        SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY,"1");
-
-#ifndef RASPBERRY
-#ifndef DARWIN
-    // Intel X11
-    SDL_SetHint(SDL_HINT_VIDEO_X11_XRANDR,"1");
-    SDL_SetHint(SDL_HINT_VIDEO_X11_XRANDR,"0");
-#endif
-#endif
-
 #ifdef DARWIN
     window = SDL_CreateWindow("wallyd", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1440, 720, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
 #else
-    window = SDL_CreateWindow("wallyd", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 0,0, SDL_WINDOW_FULLSCREEN | SDL_WINDOW_SHOWN | SDL_WINDOW_INPUT_GRABBED);
+    window = SDL_CreateWindow("wallyd", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 0, 0, SDL_WINDOW_FULLSCREEN_DESKTOP | SDL_WINDOW_MAXIMIZED | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_SHOWN | SDL_WINDOW_INPUT_GRABBED);
 #endif
     
     SDL_ShowCursor( 0 );
@@ -183,9 +220,14 @@ bool loadSDL()
     } else {
        //renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED| SDL_RENDERER_TARGETTEXTURE | SDL_RENDERER_PRESENTVSYNC );
        renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED| SDL_RENDERER_TARGETTEXTURE );
+       if(renderer == NULL) {
+            slog(ERROR, LOG_CORE, "Hardware accelerated renderer could not initialize : %s", IMG_GetError() );
+            slog(WARN, LOG_CORE, "Falling back to software renderer.");
+       	    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_TARGETTEXTURE );
+       }
 
        if(renderer == NULL){
-            slog(ERROR, LOG_CORE, "Renderer could not initialize : %s", IMG_GetError() );
+            slog(ERROR, LOG_CORE, "Renderer could not initialize : %s", SDL_GetError() );
             return false;
        }
     }
@@ -201,7 +243,7 @@ bool showTexture(SDL_Texture *tex1, int rot){
       SDL_Texture *tex2;
       if(logStr) {
          tex2 = renderLog(logStr,&r.w, &r.h);
-         r.x = 0;
+         r.x = 1;
          r.y = h - r.h;
       }
       if(rot == 0){
