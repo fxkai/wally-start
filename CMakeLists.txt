@@ -89,5 +89,6 @@ configure_file( "${CMAKE_CURRENT_SOURCE_DIR}/src/wally-release.in" "${CMAKE_CURR
 configure_file( "${CMAKE_CURRENT_SOURCE_DIR}/src/autoversion.h.in" "${CMAKE_CURRENT_SOURCE_DIR}/src/autoversion.h" )
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/etc/wallyd.conf" DESTINATION ${SYSCONFDIR})
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/etc/wallystart.conf" DESTINATION ${SYSCONFDIR})
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/etc/wallystart.conf.recovery" DESTINATION ${SYSCONFDIR})
 install(DIRECTORY etc/wallyd.d DESTINATION ${SYSCONFDIR})
 
