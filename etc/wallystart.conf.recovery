@@ -8,6 +8,6 @@ color ffffff
 fadeover 10000 $CONF/wallyd.d/images/fadein3.png
 fadeover 1000 $CONF/wallyd.d/images/fadein4.png
 color ffffff
-fadeloop 10 10000 $CONF/wallyd.d/images/fadein4.png $CONF/wallyd.d/images/fadein5-reovery.png
+fadeloop 30 10000 $CONF/wallyd.d/images/fadein4.png $CONF/wallyd.d/images/fadein5-recovery.png
 fadeover 10000 $CONF/wallyd.d/images/fadein5-recovery.png
 log WallyTV2.2 - System in recovery
