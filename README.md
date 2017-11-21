@@ -19,7 +19,7 @@ Requirements
 
 # Build
 
-```
+```bash
 cmake .
 make && make install
 ```
