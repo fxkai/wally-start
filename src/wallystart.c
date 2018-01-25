@@ -486,6 +486,25 @@ bool processCommand(char *buf)
                 logStr = strdup(cmd+4);
                 slog(DEBUG,LOG_CORE,"Set log to %s", logStr);
             }
+            else if(strcmp(myCmd,"text") == 0){
+                char *xStr = strsep(&lineCopy, " ");
+                char *yStr = strsep(&lineCopy, " ");
+                char *szStr = strsep(&lineCopy, " ");
+                char *colStr = strsep(&lineCopy, " ");
+                char *timeStr = strsep(&lineCopy, " ");
+                char *text = strsep(&lineCopy, " ");
+                if (!text) {
+                    slog(ERROR,LOG_CORE,"text <x> <y> <size> <color> <duration> <textstring>");
+                    free(lineCopy);
+                    return false;
+                }
+                int x = atoi(xStr);
+                int y = atoi(yStr);
+                int size = atoi(szStr);
+                int duration = atoi(timeStr);
+                char *txtStr = strdup(text);
+                slog(DEBUG,LOG_CORE,"Show text '%s' at (%d,%d) size %d for %d sec",txtStr, x, y, size, duration);
+            }
             else if(strcmp(myCmd,"rot") == 0){
                 char *rotStr = strsep(&lineCopy, " ");
                 rot = atoi(rotStr);
