@@ -1,8 +1,4 @@
-#include <wallystart.h>
-
-extern char *answer;
-
-char *repl_str(const char *str, const char *from, const char *to);
+#include <wallylistener.h>
 
 #ifndef WALLYPIXEL
 extern bool startupDone;
@@ -28,12 +24,12 @@ void handleCommand(char *str) {
 	            free(oldStr);
 	        }
         }
-    // The main proc should now use processCommand
-    } else {
-        cmdStr = str;
-        sdlevent.type = SDL_CMD_EVENT;
-        SDL_PushEvent(&sdlevent);
+        return;
     }
+
+    sdlevent.type = SDL_CMD_EVENT;
+    sdlevent.user.data1 = str;
+    SDL_PushEvent(&sdlevent);
 }
 #endif
 
@@ -117,8 +113,8 @@ int sgetline(int fd, char ** out)
     int bytesloaded = 0;
     int ret;
     char chr;
-    char * buf = malloc(buf_size);
-    char * newbuf;
+    char *buf = malloc(buf_size);
+    char *newbuf;
 
     if (NULL == buf){
         return -1;
@@ -172,7 +168,6 @@ int sgetline(int fd, char ** out)
 char *repl_str(const char *str, const char *from, const char *to) {
 
 	/* Adjust each of the below values to suit your needs. */
-
 	/* Increment positions cache size initially by this number. */
 	size_t cache_sz_inc = 16;
 	/* Thereafter, each time capacity needs to be increased,

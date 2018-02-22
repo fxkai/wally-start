@@ -1,37 +1,12 @@
-#include "wallystart.h"
+#define WALLYSTART_VARS
 
-SDL_Texture *t1 = NULL;
-SDL_Texture *t2 = NULL;
-SDL_Window* window = NULL;
-SDL_Renderer* renderer = NULL;
-SDL_Surface* screenSurface = NULL;
-TTF_Font *font = NULL;
-SDL_Event event;
-SDL_Color black = {0,0,0,255};
-SDL_Color white = {255,255,255,255};
-bool quit = false;
-bool niceing = false;
-bool startupDone = false;
-int rot = 0, h = 0, w = 0;
-pthread_t log_thr;
-char *logStr = NULL;
-char *cmdStr = NULL;
-char *startupScript = "/etc/wallyd.d";
-void* globalSLG;
-char *color;
-int bindPort = 1109;
-int fontSize = 16;
-// If answer == NULL, the listener will echo back the input
-// otherwise answer is sent
-char *answer = "OK\r\n";
-void sig_handler(int);
+#include "wallystart.h"
 
 int main( int argc, char* argv[] )
 {
     SDL_Texture *t3 = NULL;
     int argadd = 0;
     char *start;
-    logStr = strdup(" ");
     color = strdup("0xffffff");
     struct timespec eventDelay = { 0, 1000000};
     startupDone = false;
@@ -41,7 +16,6 @@ int main( int argc, char* argv[] )
     if (signal(SIGINT, sig_handler) == SIG_ERR){
         slog(ERROR,LOG_CORE, "Could not catch signal.");
     }
-
 
     if(argc > 1){
         start = argv[1]; 
@@ -69,17 +43,11 @@ int main( int argc, char* argv[] )
 
     dumpSDLInfo();
 
-    if( h > 0) {
-      fontSize = h / 56;
-    }
-    if(!loadFont(BASE""FONT, fontSize)){
-        exit(1);
-    }
     if(pthread_create(&log_thr, NULL, &logListener, NULL) != 0){
        slog(ERROR,LOG_CORE,"Failed to create listener thread!");
        exit(1);
     }
-    slog(INFO,LOG_CORE,"Screen size : %dx%d / Font size : %d",w,h,fontSize);
+    slog(INFO,LOG_CORE,"Screen size : %dx%d",w,h);
 
     processStartupScript(start);
 
@@ -89,22 +57,27 @@ int main( int argc, char* argv[] )
     {
        while(SDL_WaitEvent(&event) != 0)
        {
+           slog(DEBUG,LOG_CORE,"SDL event (%d).",event.type);
            if(event.type == SDL_CMD_EVENT)
            {
-               slog(DEBUG,LOG_CORE,"New CMD event %s.",cmdStr);
-               processCommand(cmdStr);
-               free(cmdStr);
+               slog(DEBUG,LOG_CORE,"New CMD event %s.",event.user.data1);
+               processCommand(event.user.data1);
+               free(event.user.data1);
+           }
+           if(event.type == SDL_WINDOWEVENT){
+                if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
+                      w = event.window.data1;
+                      h = event.window.data2;
+                      slog(INFO,LOG_CORE,"Window resized to %dx%d",w,h);
+                } 
            }
            if(event.type == SDL_MOUSEBUTTONDOWN || 
-               event.type == SDL_APP_TERMINATING || 
+                 event.type == SDL_APP_TERMINATING || 
            //    event.type == SDL_KEYDOWN || 
-               event.type == SDL_QUIT) {
-                quit = true;
+                 event.type == SDL_QUIT) {
+               quit = true;
            }
-           usleep(100000);
-           // nanosleep(&eventDelay,NULL);
            showTexture(t1, rot);
-           // slog(DEBUG,LOG_CORE,"%p %p",text,renderer);
        }
     }
     SDL_DestroyTexture(t1);
@@ -157,7 +130,8 @@ bool dumpSDLInfo()
         printf("Rendering driver in use: %s\n", rend_info->name); 
         printf("    SDL_RENDERER_SOFTWARE     [%c]\n", (rend_info->flags & SDL_RENDERER_SOFTWARE) ? 'X' : ' '); 
         printf("    SDL_RENDERER_ACCELERATED  [%c]\n", (rend_info->flags & SDL_RENDERER_ACCELERATED) ? 'X' : ' '); 
-        printf("    SDL_RENDERER_PRESENTVSYNC [%c]\n", (rend_info->flags & SDL_RENDERER_PRESENTVSYNC) ? 'X' : ' '); 
+        printf("    SDL_RENDERER_PRESENTVSYNC [%c]\n", (rend_info->flags & SDL_RENDERER_PRESENTVSYNC) ? 'X' : ' ');
+        return true;
 }
 
 bool dumpModes()
@@ -167,7 +141,7 @@ bool dumpModes()
     int j,i,display_count;
     Uint32 f;
     if ((display_count = SDL_GetNumVideoDisplays()) < 1) {
-        slog(WARN,LOG_CORE,"No VideoDisplays found.");
+        slog(WARN,LOG_CORE,"VideoDisplay count = 0");
         return false;
     }
     slog(INFO,LOG_CORE,"VideoDisplays: %i", display_count);
@@ -209,7 +183,7 @@ bool loadSDL()
     SDL_ShowCursor( 0 );
 
 #ifdef DARWIN
-    window = SDL_CreateWindow("wallyd", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1440, 720, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+    window = SDL_CreateWindow("wallyd", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1200, 720, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
 #else
     window = SDL_CreateWindow("wallyd", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 0, 0, SDL_WINDOW_FULLSCREEN_DESKTOP | SDL_WINDOW_MAXIMIZED | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_SHOWN | SDL_WINDOW_INPUT_GRABBED);
 #endif
@@ -238,27 +212,43 @@ bool loadSDL()
 
 bool showTexture(SDL_Texture *tex1, int rot){
       //SDL_Rect r = { h-16, 0, h, w };
-      SDL_Rect r = {0, 0, fontSize, w };
+      SDL_Rect rLog = {0, 0, logFontSize, w };
+      SDL_Rect rShow = {0, 0, showFontSize, w };
+      SDL_Texture *showTex = NULL;
       int tw,th;
-      SDL_Texture *tex2;
-      if(logStr) {
-         tex2 = renderLog(logStr,&r.w, &r.h);
-         r.x = 1;
-         r.y = h - r.h;
+      SDL_Texture *logTex;
+      SDL_Texture *tex3;
+      if (logStr && strlen(logStr) > 0) {
+         logTex = renderLog(logStr,&rLog.w, &rLog.h);
+         rLog.x = 1;
+         rLog.y = h - rLog.h;
       }
+      if (showText) {
+         rShow.x = showLocation.x;
+         rShow.y = showLocation.y;
+         showTex = renderText(showText, showLocation.h, showColor, &rShow.w, &rShow.h);
+      }
+
       if(rot == 0){
        	        SDL_RenderCopy( renderer, tex1, NULL, NULL);
-                if(tex2) {
-       	            SDL_RenderCopy( renderer, tex2, NULL, &r);
+                if(logTex) {
+       	            SDL_RenderCopy( renderer, logTex, NULL, &rLog);
+                }
+                if(showTex) {
+       	            SDL_RenderCopy( renderer, showTex, NULL, &rShow);
                 }
       } else {
     	        SDL_RenderCopyEx( renderer, tex1, NULL, NULL,rot, NULL,SDL_FLIP_NONE);
-                if(tex2){
-    	            SDL_RenderCopyEx( renderer, tex2, NULL, &r,rot, NULL,SDL_FLIP_NONE);
+                if(logTex){
+    	            SDL_RenderCopyEx( renderer, logTex, NULL, &rLog,rot, NULL,SDL_FLIP_NONE);
+                }
+                if(showTex) {
+       	            SDL_RenderCopy( renderer, showTex, NULL, &rShow);
                 }
       }
       SDL_RenderPresent( renderer );
-      SDL_DestroyTexture( tex2 );
+      SDL_DestroyTexture( showTex );
+      SDL_DestroyTexture( logTex );
       return true;
 }
 
@@ -352,13 +342,13 @@ SDL_Texture *loadImage(char *name)
     return text;
 }
 
-bool loadFont(char *file, int size){
-   font = TTF_OpenFont( file, size );
+TTF_Font *loadFont(char *file, int size){
+   TTF_Font *font = TTF_OpenFont( file, size );
    if ( font == NULL ) {
       slog(ERROR, LOG_CORE, "Failed to load font : %s ",TTF_GetError());
-      return false;
+      return NULL;
    } else {
-      return true;
+      return font;
    }
 }
 
@@ -372,7 +362,32 @@ void closeSDL()
     SDL_Quit();
 }
 
-SDL_Texture* renderLog(char *str,int *w, int *h)
+SDL_Texture* renderText(char *str, int size, char *color, int *w, int *h)
+{
+   SDL_Rect dest;
+   SDL_Surface *surf;
+   SDL_Texture *text;
+   SDL_Color *c = malloc(sizeof(SDL_Color));
+
+   hexToColor(color,c);
+
+   if(!showFont || (showFont && showFontSize != size)) {
+       if(showFont) TTF_CloseFont(showFont);
+       slog(INFO,LOG_CORE,"Loading font %s in size %d", BASE""FONT, size);
+       showFont = loadFont(BASE""FONT, size);
+       showFontSize = size;
+   }
+
+   surf = TTF_RenderUTF8_Blended( showFont, str, *c );
+   text = SDL_CreateTextureFromSurface( renderer, surf );
+   TTF_SizeUTF8(showFont, str, w, h);
+   SDL_FreeSurface( surf );
+   free(c);
+   return text;
+}
+
+
+SDL_Texture* renderLog(char *str,int *_w, int *_h)
 {
    SDL_Rect dest;
    SDL_Surface *rsurf,*surf;
@@ -381,9 +396,17 @@ SDL_Texture* renderLog(char *str,int *w, int *h)
 
    hexToColor(color,c);
 
-   surf = TTF_RenderUTF8_Blended( font, str, *c );
+   if(!logFont || (logFont && (logFontSize != h / 56))) {
+       if(logFont) TTF_CloseFont(logFont);
+       slog(INFO,LOG_CORE,"Loading font %s in size %d (new logfont size).", BASE""FONT, (h / 56));
+       logFont = loadFont(BASE""FONT, h / 56);
+       logFontSize = h / 56;
+   }
+
+   // slog(INFO,LOG_CORE,"%s / %d", str, strlen(str));
+   surf = TTF_RenderUTF8_Blended( logFont, str, *c );
    text = SDL_CreateTextureFromSurface( renderer, surf );
-   TTF_SizeUTF8(font, str, w, h);
+   TTF_SizeUTF8(logFont, str, _w, _h);
 
    // SDL_QueryTexture( text, NULL, NULL, w, h );
    SDL_FreeSurface( surf );
@@ -477,8 +500,8 @@ bool processCommand(char *buf)
                 SDL_DestroyTexture(t1);
             }
             else if(strcmp(myCmd,"clearlog") == 0){
-                free(logStr);
-                char *logStr = strdup(" ");
+                if(logStr) free(logStr);
+                logStr = NULL;
                 slog(DEBUG,LOG_CORE,"clearlog");
             }
             else if(strcmp(myCmd,"log") == 0){
@@ -487,23 +510,31 @@ bool processCommand(char *buf)
                 slog(DEBUG,LOG_CORE,"Set log to %s", logStr);
             }
             else if(strcmp(myCmd,"text") == 0){
+                if(showText) {
+                    // mutex lock
+                    slog(DEBUG,LOG_CORE,"Freeing old showText ptr");
+                    free(showText);
+                    showText = NULL;
+                }
                 char *xStr = strsep(&lineCopy, " ");
                 char *yStr = strsep(&lineCopy, " ");
                 char *szStr = strsep(&lineCopy, " ");
                 char *colStr = strsep(&lineCopy, " ");
                 char *timeStr = strsep(&lineCopy, " ");
-                char *text = strsep(&lineCopy, " ");
-                if (!text) {
+                showText = strdup(lineCopy);
+                if (!showText) {
                     slog(ERROR,LOG_CORE,"text <x> <y> <size> <color> <duration> <textstring>");
                     free(lineCopy);
+                    free(showText);
+                    showText = NULL;
                     return false;
                 }
-                int x = atoi(xStr);
-                int y = atoi(yStr);
-                int size = atoi(szStr);
-                int duration = atoi(timeStr);
-                char *txtStr = strdup(text);
-                slog(DEBUG,LOG_CORE,"Show text '%s' at (%d,%d) size %d for %d sec",txtStr, x, y, size, duration);
+                getNumOrPercentEx(xStr, w, &showLocation.x, 10);
+                getNumOrPercentEx(yStr, h, &showLocation.y, 10);
+                getNumOrPercentEx(szStr, w, &showLocation.h, 10);
+                showTime = atoi(timeStr);
+                showColor = strdup(colStr);
+                slog(INFO,LOG_CORE,"Show text '%s'",showText);
             }
             else if(strcmp(myCmd,"rot") == 0){
                 char *rotStr = strsep(&lineCopy, " ");
@@ -575,4 +606,46 @@ void hexToColor(char* colStr, SDL_Color *c)
    c->g = (color >> 8)  & 0xff;
    c->b = color & 0xff;
    c->a = 0;
+}
+
+// puts the number converted of string *str into *value
+// returns false if str is not at num or a percentage
+// relativeTo is the base value to calculate the percentage of
+// (i.e. 80% of 500 is 400) or the MAX value, if the given value
+// is negative, its substracted from the MAX
+// Note : the last char of the String must be % if percentage
+
+int getNumOrPercentEx(char *str, int relativeTo, int *value, int base){
+   int x=0;
+   errno = 0;
+   int err = 0;
+   if(!str) {
+      slog(INFO,LOG_UTIL,"getNumOrPercent() : string invalid");
+      return false;
+   }
+   unsigned long len = strlen(str);
+   if(str[len-1] == '%'){
+      str[len-1] = '\0';
+      if(str) x = (int)strtol(str,NULL,10);
+      //else errno = 1;
+      str[len-1] = '%';
+      if(errno) {
+         slog(WARN,LOG_UTIL,"strtol(%s) conversion error %d",str,err);
+         return false;
+      }
+      *value = relativeTo * x / 100;
+      slog(TRACE,LOG_UTIL,"it's percent : %s = %d",str,*value);
+      return true;
+   }
+   if(str) x = (int)strtol(str,NULL,base);
+   if(errno) {
+         slog(WARN,LOG_UTIL,"strtol(%s) conversion error %d",str,errno);
+         return false;
+   }
+   if(x < 0){
+      *value = relativeTo + x;
+   } else {
+      *value = x;
+   }
+   return true;
 }
