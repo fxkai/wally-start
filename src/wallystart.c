@@ -183,9 +183,9 @@ bool loadSDL()
     SDL_ShowCursor( 0 );
 
 #ifdef DARWIN
-    window = SDL_CreateWindow("wallyd", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1200, 720, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+    window = SDL_CreateWindow("wallyd", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1920, 1080, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
 #else
-    window = SDL_CreateWindow("wallyd", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 0, 0, SDL_WINDOW_FULLSCREEN_DESKTOP | SDL_WINDOW_MAXIMIZED | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_SHOWN | SDL_WINDOW_INPUT_GRABBED);
+    window = SDL_CreateWindow("wallyd", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 0, 0, SDL_WINDOW_FULLSCREEN_DESKTOP | SDL_WINDOW_MAXIMIZED | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_INPUT_GRABBED);
 #endif
     
     SDL_ShowCursor( 0 );
@@ -216,7 +216,7 @@ bool showTexture(SDL_Texture *tex1, int rot){
       SDL_Rect rShow = {0, 0, showFontSize, w };
       SDL_Texture *showTex = NULL;
       int tw,th;
-      SDL_Texture *logTex;
+      SDL_Texture *logTex = NULL;
       SDL_Texture *tex3;
       if (logStr && strlen(logStr) > 0) {
          logTex = renderLog(logStr,&rLog.w, &rLog.h);
@@ -241,14 +241,14 @@ bool showTexture(SDL_Texture *tex1, int rot){
     	        SDL_RenderCopyEx( renderer, tex1, NULL, NULL,rot, NULL,SDL_FLIP_NONE);
                 if(logTex){
     	            SDL_RenderCopyEx( renderer, logTex, NULL, &rLog,rot, NULL,SDL_FLIP_NONE);
+                    SDL_DestroyTexture( logTex );
                 }
                 if(showTex) {
        	            SDL_RenderCopy( renderer, showTex, NULL, &rShow);
+                    SDL_DestroyTexture( showTex );
                 }
       }
       SDL_RenderPresent( renderer );
-      SDL_DestroyTexture( showTex );
-      SDL_DestroyTexture( logTex );
       return true;
 }
 
@@ -444,7 +444,12 @@ bool processCommand(char *buf)
                 slog(DEBUG,LOG_CORE,"Fadein %s with delay %u",file, delay);
                 if(file && delay) {
                     t1 = loadImage(file);
-                    fadeImage(t1, rot, false, delay * 1000);
+                    if(!t1) {
+                      slog(ERROR,LOG_CORE,"Failed to load image %s.", file);
+                    } else {
+                      slog(DEBUG,LOG_CORE,"Loaded image texture %s.", file);
+                      fadeImage(t1, rot, false, delay * 1000);
+                    }
                 } else {
                     slog(DEBUG,LOG_CORE,"fadein <delay> <file>");
                 }
