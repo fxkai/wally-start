@@ -11,11 +11,11 @@ stages:
   DOCKERFILES: ${UTILS}/dockerfiles
 
 .dockerVars: &dockerVars
-  CONTAINER_TEST_IMAGE: ${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_NAME}
+  CONTAINER_TEST_IMAGE: ${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_SLUG}
   CONTAINER_STAGE_IMAGE: ${CI_REGISTRY_IMAGE}:latest-stage
   CONTAINER_LIVE_IMAGE: ${CI_REGISTRY_IMAGE}:latest-live
   # DOCKER_DRIVER: overlay
-  UTILS: /data/wallaby-ci
+  UTILS: /data/wallabyCI
   <<: *utilsVars
 
 # Clone wallaby-ci repo to get buildscripts
@@ -33,11 +33,14 @@ stages:
   mkdir -p ~/.ssh
   echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
 
-  rm -rf $UTILS && mkdir -p $UTILS && git clone git@git.freshx.de:Wallaby-CI/wallaby-ci.git $UTILS
+  if [[ ! "$CI_COMMIT_TAG" ]]; then
+      export CONTAINER_TEST_IMAGE="$CONTAINER_TEST_IMAGE"-"$CI_PIPELINE_ID"
+  fi
 
 .isProduct: &isProduct bash ${BUILDSCRIPTS}/isProduct.sh
 .loginRegistry: &loginRegistry bash ${BUILDSCRIPTS}/loginRegistry.sh
 .prepareDocker: &prepareDocker bash ${BUILDSCRIPTS}/prepareDocker.sh
+.releaseExpression: &releaseExpression /^master$|^release-.+/
 
 .docker: &docker
   variables:
@@ -47,8 +50,10 @@ stages:
     - *prepareDocker
   tags:
     - docker
+  except:
+    - *releaseExpression
 
-build:nodejs:
+build:docker:
   <<: *docker
   stage: init
   script:
@@ -71,27 +76,28 @@ test:lint:
     paths:
       - artifacts/
 
-post-test:stage-image:
-  <<: *docker
-  stage: post-test
-  script:
-    - *isProduct
-    - if [[ $IS_PRODUCT ]]; then docker pull $CONTAINER_TEST_IMAGE; fi
-    - if [[ $IS_PRODUCT ]]; then docker tag $CONTAINER_TEST_IMAGE $CONTAINER_STAGE_IMAGE; fi
-    - if [[ $IS_PRODUCT ]]; then docker push $CONTAINER_STAGE_IMAGE; fi
-  only:
-    - master
-
-post-test:live-image:
-  <<: *docker
-  stage: post-test
-  script:
-    - *isProduct
-    - if [[ $IS_PRODUCT ]]; then docker pull $CONTAINER_TEST_IMAGE; fi
-    - if [[ $IS_PRODUCT ]]; then docker tag $CONTAINER_TEST_IMAGE $CONTAINER_LIVE_IMAGE; fi
-    - if [[ $IS_PRODUCT ]]; then docker push $CONTAINER_LIVE_IMAGE; fi
-  only:
-    - master
+# TODO 
+# post-test:stage-image:
+#   <<: *docker
+#   stage: post-test
+#   script:
+#     - *isProduct
+#     - if [[ $IS_PRODUCT ]]; then docker pull $CONTAINER_TEST_IMAGE; fi
+#     - if [[ $IS_PRODUCT ]]; then docker tag $CONTAINER_TEST_IMAGE $CONTAINER_STAGE_IMAGE; fi
+#     - if [[ $IS_PRODUCT ]]; then docker push $CONTAINER_STAGE_IMAGE; fi
+#   only:
+#     - tags
+# 
+# post-test:live-image:
+#   <<: *docker
+#   stage: post-test
+#   script:
+#     - *isProduct
+#     - if [[ $IS_PRODUCT ]]; then docker pull $CONTAINER_TEST_IMAGE; fi
+#     - if [[ $IS_PRODUCT ]]; then docker tag $CONTAINER_TEST_IMAGE $CONTAINER_LIVE_IMAGE; fi
+#     - if [[ $IS_PRODUCT ]]; then docker push $CONTAINER_LIVE_IMAGE; fi
+#   only:
+#     - tags
 
 # TODO in das cd-tool verschieben!
 # deploy:staging:
@@ -120,6 +126,10 @@ deploy:wallabycd:
     - node /data/cd/wallaby-cd/app.js
   tags: 
     - mac
+#  only:
+#    - tags
+  except:
+    - *releaseExpression
 
 # TODO in cd-tool verschieben, aber in separatem job ausführen (wegen "when: manual")
 # deploy:production:
@@ -148,6 +158,8 @@ cleanup:docker:
   script:
     - bash ${BUILDSCRIPTS}/${CI_JOB_NAME}.sh
   when: always
+  except:
+    - *releaseExpression
 
 
 notify:rocket.chat:
@@ -157,3 +169,7 @@ notify:rocket.chat:
   when: on_failure
   tags:
     - chat
+  except:
+    - *releaseExpression
+
+# CUSTOM JOBS AFTER THIS LINE
