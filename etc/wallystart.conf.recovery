@@ -1,13 +1,10 @@
 rot 0
 sleep 1
 color 0
-fadein 9000 $CONF/wallyd.d/images/fadein1.png
-sleep 1
-fadeover 3000 $CONF/wallyd.d/images/fadein2.png
+fadein 12000 $CONF/wallyd.d/images/FX-logo.png
+sleep 3
 color ffffff
-fadeover 10000 $CONF/wallyd.d/images/fadein3.png
-fadeover 1000 $CONF/wallyd.d/images/fadein4.png
-color ffffff
-fadeloop 30 10000 $CONF/wallyd.d/images/fadein4.png $CONF/wallyd.d/images/fadein5-recovery.png
-fadeover 10000 $CONF/wallyd.d/images/fadein5-recovery.png
-log WallyTV2.2 - System in recovery
+fadeover 39000 $CONF/wallyd.d/images/wally-black.png
+fadeover 39000 $CONF/wallyd.d/images/wally-white-core-bar.png
+fadeloop 10 20000 $CONF/wallyd.d/images/wally-white-core-bar.png $CONF/wallyd.d/images/wally-white-core-recovery.png
+log WallyCore 2.2 Base system ready.
