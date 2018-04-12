@@ -345,7 +345,7 @@ SDL_Texture *loadImage(char *name)
 TTF_Font *loadFont(char *file, int size){
    TTF_Font *font = TTF_OpenFont( file, size );
    if ( font == NULL ) {
-      slog(ERROR, LOG_CORE, "Failed to load font : %s ",TTF_GetError());
+      log(ERROR, LOG_CORE, "Failed to load font : %s ",TTF_GetError());
       return NULL;
    } else {
       return font;
@@ -375,6 +375,7 @@ SDL_Texture* renderText(char *str, int size, char *color, int *w, int *h)
        if(showFont) TTF_CloseFont(showFont);
        slog(INFO,LOG_CORE,"Loading font %s in size %d", BASE""FONT, size);
        showFont = loadFont(BASE""FONT, size);
+       if(!showFont) return NULL;
        showFontSize = size;
    }
 
@@ -400,6 +401,7 @@ SDL_Texture* renderLog(char *str,int *_w, int *_h)
        if(logFont) TTF_CloseFont(logFont);
        slog(INFO,LOG_CORE,"Loading font %s in size %d (new logfont size).", BASE""FONT, (h / 56));
        logFont = loadFont(BASE""FONT, h / 56);
+       if(!logFont) return NULL;
        logFontSize = h / 56;
    }
 
