@@ -345,7 +345,7 @@ SDL_Texture *loadImage(char *name)
 TTF_Font *loadFont(char *file, int size){
    TTF_Font *font = TTF_OpenFont( file, size );
    if ( font == NULL ) {
-      log(ERROR, LOG_CORE, "Failed to load font : %s ",TTF_GetError());
+      slog(ERROR, LOG_CORE, "Failed to load font : %s ",TTF_GetError());
       return NULL;
    } else {
       return font;
