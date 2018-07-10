@@ -16,6 +16,9 @@
 #include <signal.h>
 #include "slog.h"
 #include "autoversion.h"
+#ifdef RASPBERRY
+#include "bcm_host.h"
+#endif
 
 #define VERSION "0.3"
 #define BASE "."
