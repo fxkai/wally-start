@@ -34,7 +34,12 @@ if(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
  endif()
 endif()
 
-if("${RASPBERRY}" STREQUAL "ON")
+include(CheckIncludeFile)
+CHECK_INCLUDE_FILE(bcm_host.h RASPBERRY)
+
+message("RPI : " ${RASPBERRY})
+
+if("${RASPBERRY}" STREQUAL "1")
     set(RPI_C_FLAGS  "-DRASPBERRY")
     set(RPI_LD_FLAGS  "-lbcm_host -lvchostif -lvcos -lvchiq_arm -lpthread -lm")
 endif()
