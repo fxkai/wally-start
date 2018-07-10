@@ -57,7 +57,7 @@ char *showColor;
 int showTime = 5;
 int showSize = 32;
 int showFontSize = 0;
-int errno = 0;
+int errno;
 SDL_Rect showLocation;
 
 bool loadSDL();
