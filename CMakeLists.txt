@@ -37,12 +37,15 @@ endif()
 include(CheckIncludeFile)
 CHECK_INCLUDE_FILE(bcm_host.h RASPBERRY)
 
-message("RPI : " ${RASPBERRY})
 
 if("${RASPBERRY}" STREQUAL "1")
     set(RPI_C_FLAGS  "-DRASPBERRY")
     set(RPI_LD_FLAGS  "-lbcm_host -lvchostif -lvcos -lvchiq_arm -lpthread -lm")
+else()
+    set(RASPBERRY 0)
 endif()
+
+message("RPI : " ${RASPBERRY})
 
 if(WITH_VIDEO STREQUAL on)
 	set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -DWITH_VIDEO")
@@ -93,7 +96,13 @@ configure_file( "${CMAKE_CURRENT_SOURCE_DIR}/etc/wallyd.conf.in" "${CMAKE_CURREN
 configure_file( "${CMAKE_CURRENT_SOURCE_DIR}/src/wally-release.in" "${CMAKE_CURRENT_SOURCE_DIR}/etc/wally-release")
 configure_file( "${CMAKE_CURRENT_SOURCE_DIR}/src/autoversion.h.in" "${CMAKE_CURRENT_SOURCE_DIR}/src/autoversion.h" )
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/etc/wallyd.conf" DESTINATION ${SYSCONFDIR})
-install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/etc/wallystart.conf" DESTINATION ${SYSCONFDIR})
-install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/etc/wallystart.conf.recovery" DESTINATION ${SYSCONFDIR})
+
+if("${RASPBERRY}" STREQUAL "1")
+  install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/etc/wallystart.conf.pi" DESTINATION "${SYSCONFDIR}/wallystart.conf")
+  install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/etc/wallystart.conf.recovery.pi" DESTINATION "${SYSCONFDIR}/wallystart.conf.recovery")
+else()
+  install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/etc/wallystart.conf" DESTINATION ${SYSCONFDIR})
+  install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/etc/wallystart.conf.recovery" DESTINATION ${SYSCONFDIR})
+endif()
 install(DIRECTORY etc/wallyd.d DESTINATION ${SYSCONFDIR})
 

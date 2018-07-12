@@ -4,7 +4,7 @@
 #
 
 #   Init raspberry GL
-raspberry=false
+raspberry=${RASPBERRY}
 
 #   Debug Level 
 #   0 = fatal
@@ -21,9 +21,6 @@ disableAudio=true
 #   Run in foreground (otherwise daemonize
 foreground=true
 
-#   disable VSync (set to true for ATI)
-#novsync=true
-
 #   Set a logfile (otherwise stderr)
 logfile=/tmp/wallyd.log
 
@@ -31,7 +28,9 @@ logfile=/tmp/wallyd.log
 plugins=${LIB_INSTALL_DIR}/wallyd
 basedir=${CMAKE_INSTALL_PREFIX}
 
+#   Print SDL debug messages
+sdldebug=false
+
 #   slog config
 LOGLEVEL 3
 
-sdldebug=true
