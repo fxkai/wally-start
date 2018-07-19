@@ -1,5 +1,8 @@
 set(TEST_SRC drmtest.c)
 
+# Remove buildroot flags (such as rdynamic to avoid buggy builds)
+SET(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")
+
 if(${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm")
   set(RPIBCM_LIBS bcm_host)
   set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} ${RPI_C_FLAGS}")
