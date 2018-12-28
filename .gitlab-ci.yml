@@ -1,166 +1,36 @@
 stages:
-  - init
   - test
-  - post-test
   - build&deploy
-  - cleanup
   - notify
 
-.utilsVars: &utilsVars
-  BUILDSCRIPTS: ${UTILS}/buildscripts
-  DOCKERFILES: ${UTILS}/dockerfiles
-
-.dockerVars: &dockerVars
-  CONTAINER_TEST_IMAGE: ${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_SLUG}
-  CONTAINER_STAGE_IMAGE: ${CI_REGISTRY_IMAGE}:latest-stage
-  CONTAINER_LIVE_IMAGE: ${CI_REGISTRY_IMAGE}:latest-live
-  # DOCKER_DRIVER: overlay
-  UTILS: /data/wallabyCI
-  <<: *utilsVars
-
-# Clone wallaby-ci repo to get buildscripts
-.utils: &utils |
-  # Run ssh-agent (inside the build environment)
-  eval $(ssh-agent -s)
-
-  # Add the SSH key stored in SSH_PRIVATE_KEY variable to the agent store
-  ssh-add /.ssh/id_rsa
-
-  # For Docker builds disable host key checking. Be aware that by adding that
-  # you are suspectible to man-in-the-middle attacks.
-  # WARNING: Use this only with the Docker executor, if you use it with shell
-  # you will overwrite your user's SSH config.
-  mkdir -p ~/.ssh
-  echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
-
-  if [[ ! "$CI_COMMIT_TAG" ]]; then
-      export CONTAINER_TEST_IMAGE="$CONTAINER_TEST_IMAGE"-"$CI_PIPELINE_ID"
-  fi
-
-.isProduct: &isProduct bash ${BUILDSCRIPTS}/isProduct.sh
-.loginRegistry: &loginRegistry bash ${BUILDSCRIPTS}/loginRegistry.sh
-.prepareDocker: &prepareDocker bash ${BUILDSCRIPTS}/prepareDocker.sh
-.releaseExpression: &releaseExpression /^master$|^release-.+/
-
-.docker: &docker
-  variables:
-    <<: *dockerVars
-  before_script:
-    - *utils
-    - *prepareDocker
-  tags:
-    - docker
-  except:
-    - *releaseExpression
-
-build:docker:
-  <<: *docker
-  stage: init
-  script:
-    - bash ${BUILDSCRIPTS}/${CI_JOB_NAME}.sh
-
 test:nodeunit:
-  <<: *docker
   stage: test
+  tags:
+    - test
   script:
-    - bash ${BUILDSCRIPTS}/${CI_JOB_NAME}.sh
+    - bash $(dirname $(nvm which current))/../lib/node_modules/wallaby-ci/buildscripts/${CI_JOB_NAME}.sh
 
 test:lint:
-  <<: *docker
   stage: test
   script:
-    - bash ${BUILDSCRIPTS}/${CI_JOB_NAME}.sh
+    - bash $(dirname $(nvm which current))/../lib/node_modules/wallaby-ci/buildscripts/${CI_JOB_NAME}.sh
+  tags:
+    - test
   artifacts:
     when: on_failure
     expire_in: 30 days
     paths:
       - artifacts/
 
-# TODO 
-# post-test:stage-image:
-#   <<: *docker
-#   stage: post-test
-#   script:
-#     - *isProduct
-#     - if [[ $IS_PRODUCT ]]; then docker pull $CONTAINER_TEST_IMAGE; fi
-#     - if [[ $IS_PRODUCT ]]; then docker tag $CONTAINER_TEST_IMAGE $CONTAINER_STAGE_IMAGE; fi
-#     - if [[ $IS_PRODUCT ]]; then docker push $CONTAINER_STAGE_IMAGE; fi
-#   only:
-#     - tags
-# 
-# post-test:live-image:
-#   <<: *docker
-#   stage: post-test
-#   script:
-#     - *isProduct
-#     - if [[ $IS_PRODUCT ]]; then docker pull $CONTAINER_TEST_IMAGE; fi
-#     - if [[ $IS_PRODUCT ]]; then docker tag $CONTAINER_TEST_IMAGE $CONTAINER_LIVE_IMAGE; fi
-#     - if [[ $IS_PRODUCT ]]; then docker push $CONTAINER_LIVE_IMAGE; fi
-#   only:
-#     - tags
-
-# TODO in das cd-tool verschieben!
-# deploy:staging:
-#   <<: *docker
-#   stage: build&deploy
-#   variables:
-#     <<: *dockerVars
-#     <<: *utilsVars
-#   before_script:
-#     - *utils
-#     - *prepareDocker
-#     - *loginRegistry
-#   script:
-#     - *isProduct
-#     - if [[ $IS_PRODUCT ]]; then bash ${BUILDSCRIPTS}/${CI_JOB_NAME}.sh; fi
-#   only:
-#     - master
-#   environment:
-#     name: staging
-#     url: http://www.freshx.de
-
 deploy:wallabycd:
   stage: build&deploy
   script:
-    - export ANDROID_HOME=/Users/freshx/Library/Android/sdk/
-    - node /data/cd/wallaby-cd/app.js
+    - export ANDROID_HOME=/opt/android-sdk-linux
+    - node $(dirname $(nvm which current))/../lib/node_modules/wallaby-cd/app.js
   tags: 
-    - mac
+    - deploy
 #  only:
 #    - tags
-  except:
-    - *releaseExpression
-
-# TODO in cd-tool verschieben, aber in separatem job ausführen (wegen "when: manual")
-# deploy:production:
-#   stage: build&deploy
-#   variables:
-#     <<: *dockerVars
-#     <<: *utilsVars
-#   before_script:
-#     - *utils
-#     - *loginRegistry
-#   script:
-#     - *isProduct
-#     - if [[ $IS_PRODUCT ]]; then bash ${BUILDSCRIPTS}/${CI_JOB_NAME}.sh; fi
-#   tags:
-#     - ssh
-#   only:
-#     - master
-#   when: manual
-#   environment:
-#     name: production
-#     url: http://www.freshx.de
-
-cleanup:docker:
-  <<: *docker
-  stage: cleanup
-  script:
-    - bash ${BUILDSCRIPTS}/${CI_JOB_NAME}.sh
-  when: always
-  except:
-    - *releaseExpression
-
 
 notify:rocket.chat:
   stage: notify
@@ -169,7 +39,5 @@ notify:rocket.chat:
   when: on_failure
   tags:
     - chat
-  except:
-    - *releaseExpression
 
 # CUSTOM JOBS AFTER THIS LINE
