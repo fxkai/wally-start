@@ -2,6 +2,8 @@
 
 #include "wallystart.h"
 
+struct texts *textFields[TEXT_SLOTS];
+
 int main( int argc, char* argv[] )
 {
     SDL_Texture *t3 = NULL;
@@ -35,6 +37,7 @@ int main( int argc, char* argv[] )
     SDL_LogSetAllPriority(SDL_LOG_PRIORITY_VERBOSE);
 #endif
 
+    initTexts();
     dumpModes();
 
     if(!loadSDL()){
@@ -68,7 +71,9 @@ int main( int argc, char* argv[] )
                 if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
                       w = event.window.data1;
                       h = event.window.data2;
+                      SDL_GL_GetDrawableSize(window, &w, &h);
                       slog(INFO,LOG_CORE,"Window resized to %dx%d",w,h);
+                      showTexture(t1, rot);
                 } 
            }
            if(event.type == SDL_MOUSEBUTTONDOWN || 
@@ -182,10 +187,11 @@ bool loadSDL()
     }
     SDL_ShowCursor( 0 );
 
-#ifdef DARWIN
+#ifndef DARWIN
     window = SDL_CreateWindow("wallyd", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1920, 1080, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
 #else
-    window = SDL_CreateWindow("wallyd", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 0, 0, SDL_WINDOW_FULLSCREEN_DESKTOP | SDL_WINDOW_MAXIMIZED | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_INPUT_GRABBED);
+    slog(INFO,LOG_CORE,"Starting in Darwin window mode.");
+    window = SDL_CreateWindow("wallyd", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1920, 1080, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_MAXIMIZED | SDL_WINDOW_ALLOW_HIGHDPI);
 #endif
     
     SDL_ShowCursor( 0 );
@@ -214,6 +220,7 @@ bool showTexture(SDL_Texture *tex1, int rot){
       //SDL_Rect r = { h-16, 0, h, w };
       SDL_Rect rLog = {0, 0, logFontSize, w };
       SDL_Rect rShow = {0, 0, showFontSize, w };
+      SDL_Rect fullSize = {0, 0, w, h };
       SDL_Texture *showTex = NULL;
       int tw,th;
       SDL_Texture *logTex = NULL;
@@ -223,25 +230,26 @@ bool showTexture(SDL_Texture *tex1, int rot){
          rLog.x = 1;
          rLog.y = h - rLog.h;
       }
-      if (showText) {
-         rShow.x = showLocation.x;
-         rShow.y = showLocation.y;
-         showTex = renderText(showText, showLocation.h, showColor, &rShow.w, &rShow.h);
-      }
+      //if (showText) {
+      //   rShow.x = showLocation.x;
+      //   rShow.y = showLocation.y;
+      //   showTex = renderText(showText, showLocation.h, showColor, &rShow.w, &rShow.h);
+      //}
 
       if(rot == 0){
-       	        SDL_RenderCopy( renderer, tex1, NULL, NULL);
+       	        SDL_RenderCopy(renderer, tex1, NULL, &fullSize);
                 if(logTex) {
-       	            SDL_RenderCopy( renderer, logTex, NULL, &rLog);
+       	            SDL_RenderCopy(renderer, logTex, NULL, &rLog);
                 }
                 if(showTex) {
-       	            SDL_RenderCopy( renderer, showTex, NULL, &rShow);
+       	            SDL_RenderCopy(renderer, showTex, NULL, &rShow);
                 }
+                renderTexts();
       } else {
-    	        SDL_RenderCopyEx( renderer, tex1, NULL, NULL,rot, NULL,SDL_FLIP_NONE);
+    	        SDL_RenderCopyEx(renderer, tex1, NULL, NULL,rot, NULL,SDL_FLIP_NONE);
                 if(logTex){
-    	            SDL_RenderCopyEx( renderer, logTex, NULL, &rLog,rot, NULL,SDL_FLIP_NONE);
-                    SDL_DestroyTexture( logTex );
+    	            SDL_RenderCopyEx(renderer, logTex, NULL, &rLog,rot, NULL,SDL_FLIP_NONE);
+                    SDL_DestroyTexture(logTex );
                 }
                 if(showTex) {
        	            SDL_RenderCopy( renderer, showTex, NULL, &rShow);
@@ -262,9 +270,9 @@ bool fadeOver(SDL_Texture *t1, SDL_Texture *t2,int rot, long delay){
     SDL_SetTextureBlendMode(t2, SDL_BLENDMODE_BLEND);
     for(i = 255; i >= 0;i-=4){
          SDL_SetRenderTarget(renderer, temp);
-    	 SDL_RenderCopyEx( renderer, t2, NULL, NULL,rot, NULL,SDL_FLIP_NONE);
+    	   SDL_RenderCopyEx( renderer, t2, NULL, NULL,rot, NULL,SDL_FLIP_NONE);
          SDL_SetTextureAlphaMod(t1,i);
-    	 SDL_RenderCopyEx( renderer, t1, NULL, NULL,rot, NULL,SDL_FLIP_NONE);
+    	   SDL_RenderCopyEx( renderer, t1, NULL, NULL,rot, NULL,SDL_FLIP_NONE);
          SDL_SetRenderTarget(renderer, NULL);
          showTexture(temp, rot);
          nanosleep(&t,NULL);
@@ -352,7 +360,6 @@ TTF_Font *loadFont(char *file, int size){
    }
 }
 
-
 void closeSDL()
 {
     SDL_DestroyRenderer( renderer );
@@ -362,31 +369,98 @@ void closeSDL()
     SDL_Quit();
 }
 
-SDL_Texture* renderText(char *str, int size, char *color, int *w, int *h)
-{
-   SDL_Rect dest;
-   SDL_Surface *surf;
-   SDL_Texture *text;
-   SDL_Color *c = malloc(sizeof(SDL_Color));
+// SDL_Texture* renderText(char *str, int size, char *color, int *w, int *h)
+// {
+//    SDL_Rect dest;
+//    SDL_Surface *surf;
+//    SDL_Texture *text;
+//    SDL_Color *c = malloc(sizeof(SDL_Color));
+// 
+//    hexToColor(color,c);
+// 
+//    if(!showFont || (showFont && showFontSize != size)) {
+//        if(showFont) TTF_CloseFont(showFont);
+//        slog(INFO,LOG_CORE,"Loading font %s in size %d", BASE""FONT, size);
+//        showFont = loadFont(BASE""FONT, size);
+//        if(!showFont) return NULL;
+//        showFontSize = size;
+//    }
+// 
+//    surf = TTF_RenderUTF8_Blended( showFont, str, *c );
+//    text = SDL_CreateTextureFromSurface( renderer, surf );
+//    TTF_SizeUTF8(showFont, str, w, h);
+//    SDL_FreeSurface( surf );
+//    free(c);
+//    return text;
+// }
 
-   hexToColor(color,c);
+void initTexts(void) {
+    int bytes = sizeof(struct texts);
+    for(int i = 0; i < TEXT_SLOTS; i++) {
+        textFields[i] = malloc(bytes);
+        memset(textFields[i], 0, bytes);
+        textFields[i]->active = false;
+    }
+    // size_t n = sizeof(textFields) / sizeof(textFields);
+    //textFields = malloc(bytes * TEXT_SLOTS);
+    //memset(textFields, 0, bytes * TEXT_SLOTS);
+    slog(INFO,LOG_CORE, "Initialized %d bytes", bytes * TEXT_SLOTS);
+}
+
+void renderTexts(void)
+{
+    int count = 0;
+    SDL_Rect r = { 0,0,0,0 };
+    for(int i = 0; i < TEXT_SLOTS; i++) {
+        if (textFields[i]->active) {
+            count ++;
+            SDL_Texture *tex = textFields[i]->tex;
+            r.x = textFields[i]->x;
+            r.y = textFields[i]->y;
+            r.w = textFields[i]->w;
+            r.h = textFields[i]->h;
+       	    SDL_RenderCopy(renderer, tex, NULL, &r);
+        }
+    }
+}
+
+bool setupText(int id, int x, int y, int size, char *color, long timeout, char *str)
+{
+   SDL_Surface *surf;
+   texts *t = textFields[id];
+
+   t->x = x;
+   t->y = y;
+
+   slog(INFO,LOG_CORE, "Setting up text %d(%d,%d, sz %d, color %s) : %s for %d seconds", id, x, y, size, color, str, timeout);
+   if (!t->tex) {
+       slog(INFO,LOG_CORE, "Freeing old text slot.");
+       SDL_DestroyTexture(t->tex);
+       free(t->str);
+   }
+
+   t->active = true;
+   t->str = str;
+   
+   hexToColor(color, &t->color);
 
    if(!showFont || (showFont && showFontSize != size)) {
        if(showFont) TTF_CloseFont(showFont);
        slog(INFO,LOG_CORE,"Loading font %s in size %d", BASE""FONT, size);
        showFont = loadFont(BASE""FONT, size);
-       if(!showFont) return NULL;
+       if(!showFont) return false;
        showFontSize = size;
    }
 
-   surf = TTF_RenderUTF8_Blended( showFont, str, *c );
-   text = SDL_CreateTextureFromSurface( renderer, surf );
-   TTF_SizeUTF8(showFont, str, w, h);
-   SDL_FreeSurface( surf );
-   free(c);
-   return text;
-}
+   surf = TTF_RenderUTF8_Blended( showFont, str, t->color );
+   t->tex = SDL_CreateTextureFromSurface( renderer, surf );
 
+   if (!t->tex) return false;
+   TTF_SizeUTF8(showFont, str, &t->w, &t->h);
+   SDL_FreeSurface( surf );
+
+   return true;
+}
 
 SDL_Texture* renderLog(char *str,int *_w, int *_h)
 {
@@ -517,31 +591,26 @@ bool processCommand(char *buf)
                 slog(DEBUG,LOG_CORE,"Set log to %s", logStr);
             }
             else if(strcmp(myCmd,"text") == 0){
-                if(showText) {
-                    // mutex lock
-                    slog(DEBUG,LOG_CORE,"Freeing old showText ptr");
-                    free(showText);
-                    showText = NULL;
-                }
+                char *idStr = strsep(&lineCopy, " ");
                 char *xStr = strsep(&lineCopy, " ");
                 char *yStr = strsep(&lineCopy, " ");
                 char *szStr = strsep(&lineCopy, " ");
                 char *colStr = strsep(&lineCopy, " ");
                 char *timeStr = strsep(&lineCopy, " ");
+                int tx = 0;
+                int ty = 0;
+                int tsize = 0;
                 showText = strdup(lineCopy);
                 if (!showText) {
-                    slog(ERROR,LOG_CORE,"text <x> <y> <size> <color> <duration> <textstring>");
+                    slog(ERROR,LOG_CORE,"text <id 1-255> <x> <y> <size> <color> <duration> <textstring>");
                     free(lineCopy);
                     free(showText);
-                    showText = NULL;
                     return false;
                 }
-                getNumOrPercentEx(xStr, w, &showLocation.x, 10);
-                getNumOrPercentEx(yStr, h, &showLocation.y, 10);
-                getNumOrPercentEx(szStr, w, &showLocation.h, 10);
-                showTime = atoi(timeStr);
-                showColor = strdup(colStr);
-                slog(INFO,LOG_CORE,"Show text '%s'",showText);
+                getNumOrPercentEx(xStr, w, &tx, 10);
+                getNumOrPercentEx(yStr, h, &ty, 10);
+                getNumOrPercentEx(szStr, h, &tsize, 10);
+                setupText(atoi(idStr), tx, ty, tsize, strdup(colStr), atoi(timeStr), showText);
             }
             else if(strcmp(myCmd,"rot") == 0){
                 char *rotStr = strsep(&lineCopy, " ");

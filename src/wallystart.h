@@ -20,6 +20,7 @@
 #include "bcm_host.h"
 #endif
 
+#define TEXT_SLOTS 255
 #define VERSION "0.3"
 #define BASE "."
 #define FONT "/etc/wallyd.d/fonts/Cairo-Regular.ttf"
@@ -60,6 +61,21 @@ int showFontSize = 0;
 int errno;
 SDL_Rect showLocation;
 
+typedef struct texts {
+  int x;
+  int y;
+  int w;
+  int h;
+  int size;
+  SDL_Color color;
+  SDL_Texture *tex;
+  char *str;
+  long timeout;
+  bool active;
+} texts;
+
+void initTexts(void);
+void renderTexts(void);
 bool loadSDL();
 bool dumpSDLInfo();
 TTF_Font *loadFont(char *file, int size);
