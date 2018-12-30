@@ -209,20 +209,17 @@ bool dumpModes()
 bool loadSDL()
 {
     bool mode2d = false;
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0)
-    {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
         slog(ERROR, LOG_CORE, "SDL could not initialize! SDL Error: %s", IMG_GetError());
         return false;
     }
     int flags = IMG_INIT_JPG | IMG_INIT_PNG;
     int initted = IMG_Init(flags);
-    if ((initted & flags) != flags)
-    {
+    if ((initted & flags) != flags) {
         slog(ERROR, LOG_CORE, "SDL_image could not initialize PNG and JPG! SDL_image Error: %s", IMG_GetError());
         return false;
     }
-    if (TTF_Init() == -1)
-    {
+    if (TTF_Init() == -1) {
         slog(ERROR, LOG_CORE, "SDL_TTF could not initialize! SDL_ttf Error: %s", TTF_GetError());
         return false;
     }
@@ -241,27 +238,20 @@ bool loadSDL()
 #endif
 
     SDL_ShowCursor(0);
-    if (mode2d)
-    {
-        screenSurface = SDL_GetWindowSurface(window);
+    //renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED| SDL_RENDERER_TARGETTEXTURE | SDL_RENDERER_PRESENTVSYNC );
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_TARGETTEXTURE);
+    if (renderer == NULL) {
+        slog(ERROR, LOG_CORE, "Hardware accelerated renderer could not initialize : %s", IMG_GetError());
+        slog(WARN, LOG_CORE, "Falling back to software renderer.");
+        renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_TARGETTEXTURE);
     }
-    else
-    {
-        //renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED| SDL_RENDERER_TARGETTEXTURE | SDL_RENDERER_PRESENTVSYNC );
-        renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_TARGETTEXTURE);
-        if (renderer == NULL)
-        {
-            slog(ERROR, LOG_CORE, "Hardware accelerated renderer could not initialize : %s", IMG_GetError());
-            slog(WARN, LOG_CORE, "Falling back to software renderer.");
-            renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_TARGETTEXTURE);
-        }
 
-        if (renderer == NULL)
-        {
-            slog(ERROR, LOG_CORE, "Renderer could not initialize : %s", SDL_GetError());
-            return false;
-        }
+    if (renderer == NULL) {
+        slog(ERROR, LOG_CORE, "Renderer could not initialize : %s", SDL_GetError());
+        return false;
     }
+    SDL_SetWindowInputFocus(window);
+
     SDL_GetRendererOutputSize(renderer, &w, &h);
 
     return true;
@@ -294,27 +284,14 @@ bool fadeOver(SDL_Texture *t1, SDL_Texture *t2, int rot, long delay)
 bool fadeImage(SDL_Texture *text, int rot, bool reverse, long delay)
 {
     struct timespec t = {0, delay};
-    //SDL_SetRenderDrawColor(renderer, 0,0,0, 0xFF);
-    //SDL_RenderClear(renderer);
     int v = 0;
     int i = 0;
-    for (i = 0; i < 255; i += 2)
-    {
-        if (reverse)
-        {
+    for (i = 0; i < 255; i += 2) {
+        if (reverse) {
             v = 255 - i;
-        }
-        else
-        {
+        } else {
             v = i;
         }
-        //    SDL_SetRenderDrawColor(renderer, i,i,i, 0xFF);
-        //     SDL_RenderClear(renderer);
-        //      SDL_RenderPresent( renderer );
-        //      nanosleep(&t,NULL);
-        //rot=i*360/255;
-        //SDL_SetTextureBlendMode(text, SDL_BLENDMODE_BLEND);
-        //SDL_SetTextureAlphaMod(text,i);
         SDL_SetTextureColorMod(text, v, v, v);
         update(text, rot);
         nanosleep(&t, NULL);
@@ -329,41 +306,27 @@ SDL_Texture *loadImage(char *name)
     SDL_Surface *image = NULL;
     SDL_Texture *text = NULL;
 
-    if (mode2d == true)
-    {
+    if (mode2d == true) {
         image = IMG_Load(name);
-        if (image == NULL)
-        {
+        if (image == NULL) {
             slog(ERROR, LOG_CORE, "Unable to load image %s! SDL Error: %s", name, SDL_GetError());
             return false;
         }
         SDL_Surface *optimizedSurface = SDL_ConvertSurface(image, screenSurface->format, 0);
 
-        if (SDL_BlitScaled(optimizedSurface, NULL, screenSurface, NULL))
-        {
+        if (SDL_BlitScaled(optimizedSurface, NULL, screenSurface, NULL)) {
             slog(ERROR, LOG_CORE, "Unable to blit image %s! SDL Error: %s", name, SDL_GetError());
             return false;
         }
         SDL_UpdateWindowSurface(window);
-    }
-    else
-    {
-
+    } else {
         SDL_Rect rect = {0, 0, 0, 0};
         text = IMG_LoadTexture(renderer, name);
-        if (text == NULL)
-        {
+        if (text == NULL) {
             slog(ERROR, LOG_CORE, "Error loading image : %s", IMG_GetError());
             return false;
         }
         SDL_SetTextureBlendMode(text, SDL_BLENDMODE_BLEND);
-        //if(rot == 0){
-        //		SDL_RenderCopy( renderer, text, NULL, NULL);
-        //} else {
-        //		SDL_RenderCopyEx( renderer, text, NULL, NULL,rot, NULL,SDL_FLIP_NONE);
-        //}
-        //SDL_DestroyTexture(text);
-        //SDL_RenderPresent( renderer );
     }
     return text;
 }
@@ -371,13 +334,10 @@ SDL_Texture *loadImage(char *name)
 TTF_Font *loadFont(char *file, int size)
 {
     TTF_Font *font = TTF_OpenFont(file, size);
-    if (font == NULL)
-    {
+    if (font == NULL) {
         slog(ERROR, LOG_CORE, "Failed to load font : %s ", TTF_GetError());
         return NULL;
-    }
-    else
-    {
+    } else {
         return font;
     }
 }
@@ -400,9 +360,6 @@ void initTexts(void)
         memset(textFields[i], 0, bytes);
         textFields[i]->active = false;
     }
-    // size_t n = sizeof(textFields) / sizeof(textFields);
-    //textFields = malloc(bytes * TEXT_SLOTS);
-    //memset(textFields, 0, bytes * TEXT_SLOTS);
     slog(INFO, LOG_CORE, "Initialized %d bytes", bytes * TEXT_SLOTS);
 }
 
@@ -420,8 +377,24 @@ void renderTexts(void)
             r.y = textFields[i]->y;
             r.w = textFields[i]->w;
             r.h = textFields[i]->h;
-            SDL_RenderCopy(renderer, tex, NULL, &r);
+            if (!rot) {
+                SDL_RenderCopy(renderer, tex, NULL, &r);
+            } else {
+                SDL_RenderCopyEx(renderer, tex, NULL, &r, rot, NULL, SDL_FLIP_NONE);
+            }
         }
+    }
+}
+
+void clearText(int id) {
+    texts *t = textFields[id];
+    if (!t->tex)
+    {
+        slog(INFO, LOG_CORE, "Freeing old text slot.");
+        SDL_DestroyTexture(t->tex);
+        free(t->str);
+        t->active = false;
+        update(t1, rot);
     }
 }
 
@@ -466,37 +439,6 @@ bool setupText(int id, int x, int y, int size, char *color, long timeout, char *
     SDL_FreeSurface(surf);
 
     return true;
-}
-
-SDL_Texture *renderLog(char *str, int *_w, int *_h)
-{
-    SDL_Rect dest;
-    SDL_Surface *rsurf, *surf;
-    SDL_Texture *text;
-    SDL_Color *c = malloc(sizeof(SDL_Color));
-
-    hexToColor(color, c);
-
-    if (!logFont || (logFont && (logFontSize != h / 56)))
-    {
-        if (logFont)
-            TTF_CloseFont(logFont);
-        slog(INFO, LOG_CORE, "Loading font %s in size %d (new logfont size).", BASE "" FONT, (h / 56));
-        logFont = loadFont(BASE "" FONT, h / 56);
-        if (!logFont)
-            return NULL;
-        logFontSize = h / 56;
-    }
-
-    // slog(INFO,LOG_CORE,"%s / %d", str, strlen(str));
-    surf = TTF_RenderUTF8_Blended(logFont, str, *c);
-    text = SDL_CreateTextureFromSurface(renderer, surf);
-    TTF_SizeUTF8(logFont, str, _w, _h);
-
-    // SDL_QueryTexture( text, NULL, NULL, w, h );
-    SDL_FreeSurface(surf);
-    free(c);
-    return text;
 }
 
 void sig_handler(int signo)
