@@ -21,21 +21,21 @@
 #endif
 
 #define TEXT_SLOTS 255
-#define VERSION "0.3"
+#define VERSION "0.4"
 #define BASE "."
 #define FONT "/etc/wallyd.d/fonts/Cairo-Regular.ttf"
 #define START WALLYD_CONFDIR"/wallystart.conf"
 #define SDL_CMD_EVENT    (SDL_USEREVENT + 3)
 
 int EventFilter(void *userdata, SDL_Event *event);
-void initTexts(void);
+void initGFX(void);
+void cleanupGFX();
 void renderTexts(void);
 bool setupText(int id, int x, int y, int size, char *color, long timeout, char *str);
 bool loadSDL();
 bool dumpSDLInfo();
 TTF_Font *loadFont(char *file, int size);
-bool fadeImage(SDL_Texture *text, int rot, bool reverse, long delay);
-bool update(SDL_Texture *text, int rot);
+bool update(SDL_Texture *tex);
 SDL_Texture* loadImage(char *name);
 void closeSDL();
 bool dumpModes(void);
@@ -48,9 +48,20 @@ void hexToColor(char * colStr, SDL_Color *c);
 void sig_handler(int);
 SDL_Texture* renderText(char *, int, char *, int *, int *);
 int getNumOrPercentEx(char *str, int relativeTo, int *value, int base);
-bool fadeImage(SDL_Texture *text, int rot, bool reverse, long delay);
-bool fadeOver(SDL_Texture *t1, SDL_Texture *t2,int rot, long delay);
+bool fadeImage(SDL_Texture *text, bool reverse, long delay);
+bool fadeOver(SDL_Texture *to, SDL_Texture *from, long delay);
 void clearText(int id);
+
+typedef struct texture {
+  int x;
+  int y;
+  int w;
+  int h;
+  int alpha;
+  SDL_Color color;
+  SDL_Texture *tex;
+  bool active;
+} texture;
 
 typedef struct texts {
   int x;
@@ -58,6 +69,7 @@ typedef struct texts {
   int w;
   int h;
   int size;
+  int alpha;
   SDL_Color color;
   SDL_Texture *tex;
   char *str;
@@ -66,15 +78,13 @@ typedef struct texts {
 } texts;
 
 #ifdef WALLYSTART_VARS
-SDL_Texture *t1 = NULL;
-SDL_Texture *t2 = NULL;
 SDL_Window* window = NULL;
 SDL_Renderer* renderer = NULL;
 SDL_Surface* screenSurface = NULL;
 TTF_Font *showFont = NULL;
 SDL_Event event;
-SDL_Color black = {0,0,0,255};
-SDL_Color white = {255,255,255,255};
+//SDL_Color black = {0,0,0,255};
+//SDL_Color white = {255,255,255,255};
 bool quit = false;
 bool niceing = false;
 bool repaint = false;
@@ -87,23 +97,16 @@ char *startupScript = "/etc/wallyd.d";
 void* globalSLG;
 char *color;
 int bindPort = 1109;
-int logFontSize = 16;
 // If answer == NULL, the listener will echo back the input
 // otherwise answer is sent
 char *answer = "OK\r\n";
-
 char *showText = NULL;
-char *showColor;
-int showTime = 5;
-int showSize = 32;
 int showFontSize = 0;
 int errno;
-SDL_Rect showLocation;
 
 struct texts *textFields[TEXT_SLOTS];
+struct texture *textures[2];
 #else
-extern SDL_Texture *t1;
-extern SDL_Texture *t2;
 extern SDL_Window* window;
 extern SDL_Renderer* renderer;
 extern SDL_Surface* screenSurface;
@@ -116,12 +119,9 @@ extern char *startupScript;
 extern char *color;
 extern char *answer;
 extern char *showText;
-extern char *showColor;
-extern int showTime;
-extern int showSize;
 extern int showFontSize;
-extern SDL_Rect showLocation;
 extern struct texts *textFields[TEXT_SLOTS];
+extern struct texture *textures[2];
 extern int errno;
 #endif // WALLYSTART_VARS
 

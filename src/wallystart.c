@@ -9,34 +9,19 @@ int main(int argc, char *argv[])
 
     slog_init(NULL, WALLYD_CONFDIR "/wallyd.conf", DEFAULT_LOG_LEVEL, 0, LOG_ALL, LOG_ALL, true);
 
+    slog(INFO, LOG_CORE, "%s (V" VERSION ")", argv[0]);
+
     if (signal(SIGINT, sig_handler) == SIG_ERR) {
         slog(ERROR, LOG_CORE, "Could not catch signal.");
+        exit(1);
     }
 
     if (argc > 1) {
         start = argv[1];
     }
 
-    slog(INFO, LOG_CORE, "%s (V" VERSION ")", argv[0]);
-
-#ifdef RASPBERRY
-    bcm_host_init();
-    slog(INFO, LOG_TEXTURE, "Initializing broadcom hardware");
-#endif
-#ifndef DARWIN
-    slog(INFO, LOG_TEXTURE, "Enable SDL2 verbose logging");
-    SDL_LogSetAllPriority(SDL_LOG_PRIORITY_VERBOSE);
-#endif
-
-    initTexts();
-    dumpModes();
-
-    if (!loadSDL()) {
-        slog(ERROR, LOG_CORE, "Failed to initialize SDL. Exit");
-        exit(1);
-    }
-
-    dumpSDLInfo();
+    initGFX();
+    slog(INFO, LOG_CORE, "Screen size : %dx%d", w, h);
 
     // preFilter all Window events
     SDL_SetEventFilter(EventFilter, NULL);
@@ -47,10 +32,9 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    slog(INFO, LOG_CORE, "Screen size : %dx%d", w, h);
-
+    // detach startup script reader
     if (pthread_create(&startup_thr, NULL, &processScript, start) != 0) {
-        slog(ERROR, LOG_CORE, "Failed to create startup thread!");
+        slog(ERROR, LOG_CORE, "Failed to create startup scipt thread!");
         exit(1);
     }
 
@@ -62,31 +46,25 @@ int main(int argc, char *argv[])
             free(event.user.data1);
             continue;
         }
-        update(t1, rot);
+        update(textures[0]->tex);
         slog(DEBUG, LOG_CORE, "Uncaught SDL event (%d / %d).", event.type, quit);
     }
 
-    SDL_DestroyTexture(t1);
-    if (t2) {
-        SDL_DestroyTexture(t2);
-    }
-    closeSDL();
+    cleanupGFX();
+
     return 0;
 }
 
-bool update(SDL_Texture *tex1, int rot)
+bool update(SDL_Texture *tex)
 {
-    //SDL_Rect r = { h-16, 0, h, w };
-    SDL_Rect rShow = {0, 0, showFontSize, w};
     SDL_Rect fullSize = {0, 0, w, h};
-    int tw, th;
-    SDL_Texture *tex3;
 
-    if (rot == 0) {
-        SDL_RenderCopy(renderer, tex1, NULL, &fullSize);
+    if (!rot) {
+        SDL_RenderCopy(renderer, tex, NULL, &fullSize);
     } else {
-        SDL_RenderCopyEx(renderer, tex1, NULL, NULL, rot, NULL, SDL_FLIP_NONE);
+        SDL_RenderCopyEx(renderer, tex, NULL, NULL, rot, NULL, SDL_FLIP_NONE);
     }
+
     renderTexts();
     SDL_RenderPresent(renderer);
 
@@ -95,18 +73,16 @@ bool update(SDL_Texture *tex1, int rot)
 
 bool processCommand(char *buf)
 {
-    int ret;
+    int logSize = h / 56;
     int i;
     int validCmd = 0;
     bool nextLine = true;
-    char *lineBreak, *spaceBreak;
+    char *lineBreak;
     char *lineCopy = NULL;
     char *cmd = strtok_r(buf, "\n", &lineBreak);
-    int logSize = h / 56;
     while (nextLine)
     {
         // TODO : Keep track of this and clean it up!
-        unsigned long cmdLen = strlen(cmd);
         lineCopy = repl_str(cmd, "$CONF", WALLYD_CONFDIR);
         void *linePtr = lineCopy;
         if (cmd[0] != '#') {
@@ -124,12 +100,13 @@ bool processCommand(char *buf)
                 long delay = atol(delayStr);
                 slog(DEBUG, LOG_CORE, "Fadein %s with delay %u", file, delay);
                 if (file && delay) {
-                    t1 = loadImage(file);
-                    if (!t1) {
+                    textures[0]->tex = loadImage(file);
+                    textures[0]->active = true;
+                    if (!textures[0]->tex) {
                         slog(ERROR, LOG_CORE, "Failed to load image %s.", file);
                     } else {
                         slog(DEBUG, LOG_CORE, "Loaded image texture %s.", file);
-                        fadeImage(t1, rot, false, delay * 1000);
+                        fadeImage(textures[0]->tex, false, delay * 1000);
                     }
                 } else {
                     slog(DEBUG, LOG_CORE, "fadein <delay> <file>");
@@ -141,10 +118,10 @@ bool processCommand(char *buf)
                 long delay = atol(delayStr);
                 slog(DEBUG, LOG_CORE, "Fadeover %s with delay %u", file, delay);
                 if (file && delay) {
-                    t2 = loadImage(file);
-                    fadeOver(t1, t2, rot, delay * 1000);
-                    SDL_DestroyTexture(t1);
-                    t1 = t2;
+                    textures[1]->tex = loadImage(file);
+                    fadeOver(textures[0]->tex, textures[1]->tex, delay * 1000);
+                    SDL_DestroyTexture(textures[0]->tex);
+                    textures[0]->tex = textures[1]->tex;
                 } else {
                     slog(DEBUG, LOG_CORE, "fadeover <delay> <file>");
                 }
@@ -157,15 +134,16 @@ bool processCommand(char *buf)
                 long loop = atol(loopStr);
                 slog(DEBUG, LOG_CORE, "Fadeloop %d times from  %s to %s with delay %u", loop, fileA, fileB, delay);
                 if (fileA && fileB && loop && delay) {
-                    t1 = loadImage(fileA);
-                    t2 = loadImage(fileB);
+                    textures[0]->tex = loadImage(fileA);
+                    textures[1]->tex = loadImage(fileB);
                     for (i = 0; i < loop; i++) {
-                        fadeOver(t1, t2, rot, delay * 1000);
-                        fadeOver(t2, t1, rot, delay * 1000);
+                        fadeOver(textures[0]->tex, textures[1]->tex, delay * 1000);
+                        fadeOver(textures[1]->tex, textures[0]->tex, delay * 1000);
                     }
-                    fadeOver(t1, t2, rot, delay * 1000);
-                    SDL_DestroyTexture(t1);
-                    t1 = t2;
+                    fadeOver(textures[0]->tex, textures[1]->tex, delay * 1000);
+                    SDL_DestroyTexture(textures[0]->tex);
+                    textures[0]->tex = textures[1]->tex;
+                    textures[0]->active = true;
                 } else {
                     slog(DEBUG, LOG_CORE, "fadeloop <num> <delay> <fileA> <fileB>");
                 }
@@ -177,11 +155,12 @@ bool processCommand(char *buf)
                 }
                 slog(DEBUG, LOG_CORE, "Fadeout with delay %u", delay);
                 if (delay) {
-                    fadeImage(t1, rot, true, delay * 1000);
+                    fadeImage(textures[0]->tex, true, delay * 1000);
                 } else {
                     slog(DEBUG, LOG_CORE, "fadeout <delay>");
                 }
-                SDL_DestroyTexture(t1);
+                SDL_DestroyTexture(textures[0]->tex);
+                textures[0]->active = false;
             } else if (strcmp(myCmd, "clearlog") == 0) {
                 clearText(0);
             } else if (strcmp(myCmd, "log") == 0) {
@@ -212,7 +191,7 @@ bool processCommand(char *buf)
                 getNumOrPercentEx(yStr, h, &ty, 10);
                 getNumOrPercentEx(szStr, h, &tsize, 10);
                 setupText(atoi(idStr), tx, ty, tsize, strdup(colStr), atoi(timeStr), showText);
-                update(t1, 0);
+                update(textures[0]->tex);
             } else if (strcmp(myCmd, "rot") == 0)
             {
                 char *rotStr = strsep(&lineCopy, " ");

@@ -96,12 +96,12 @@ int EventFilter(void *userdata, SDL_Event *event)
             w = event->window.data1;
             h = event->window.data2;
             SDL_GL_GetDrawableSize(window, &w, &h);
-            slog(INFO, LOG_CORE, "Window resized to %dx%d", w, h);
+            slog(DEBUG, LOG_CORE, "Window resized to %dx%d", w, h);
             return true;
         }
         if (event->window.event == SDL_WINDOWEVENT_EXPOSED)
         {
-            slog(INFO, LOG_CORE, "Window exposed. Redraw needed.");
+            slog(DEBUG, LOG_CORE, "Window exposed. Redraw needed.");
             repaint = true;
             return true;
         }
@@ -208,7 +208,6 @@ bool dumpModes()
 
 bool loadSDL()
 {
-    bool mode2d = false;
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
         slog(ERROR, LOG_CORE, "SDL could not initialize! SDL Error: %s", IMG_GetError());
         return false;
@@ -226,7 +225,7 @@ bool loadSDL()
     SDL_ShowCursor(0);
 
 #ifdef DARWIN
-    slog(INFO, LOG_CORE, "Starting in Darwin window mode.");
+    slog(DEBUG, LOG_CORE, "Starting in Darwin window mode.");
     window = SDL_CreateWindow("wallyd",
                  SDL_WINDOWPOS_CENTERED,
                  SDL_WINDOWPOS_CENTERED, 
@@ -234,7 +233,12 @@ bool loadSDL()
                  0, 
                  SDL_WINDOW_RESIZABLE | SDL_WINDOW_MAXIMIZED | SDL_WINDOW_ALLOW_HIGHDPI);
 #else
-    window = SDL_CreateWindow("wallyd", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1920, 1080, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+    window = SDL_CreateWindow("wallyd", 
+                 SDL_WINDOWPOS_CENTERED, 
+                 SDL_WINDOWPOS_CENTERED, 
+                 1920, 
+                 1080, 
+                 SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
 #endif
 
     SDL_ShowCursor(0);
@@ -257,12 +261,10 @@ bool loadSDL()
     return true;
 }
 
-bool fadeOver(SDL_Texture *t1, SDL_Texture *t2, int rot, long delay)
+bool fadeOver(SDL_Texture *t1, SDL_Texture *t2, long delay)
 {
     struct timespec t = {0, delay};
-    int v = 0;
     int i = 0;
-    SDL_Rect size;
     SDL_Texture *temp = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, w, h);
     SDL_SetTextureBlendMode(t1, SDL_BLENDMODE_BLEND);
     SDL_SetTextureBlendMode(t2, SDL_BLENDMODE_BLEND);
@@ -273,7 +275,7 @@ bool fadeOver(SDL_Texture *t1, SDL_Texture *t2, int rot, long delay)
         SDL_SetTextureAlphaMod(t1, i);
         SDL_RenderCopyEx(renderer, t1, NULL, NULL, rot, NULL, SDL_FLIP_NONE);
         SDL_SetRenderTarget(renderer, NULL);
-        update(temp, rot);
+        update(temp);
         nanosleep(&t, NULL);
     }
     SDL_DestroyTexture(temp);
@@ -281,7 +283,7 @@ bool fadeOver(SDL_Texture *t1, SDL_Texture *t2, int rot, long delay)
     return true;
 }
 
-bool fadeImage(SDL_Texture *text, int rot, bool reverse, long delay)
+bool fadeImage(SDL_Texture *text, bool reverse, long delay)
 {
     struct timespec t = {0, delay};
     int v = 0;
@@ -293,7 +295,7 @@ bool fadeImage(SDL_Texture *text, int rot, bool reverse, long delay)
             v = i;
         }
         SDL_SetTextureColorMod(text, v, v, v);
-        update(text, rot);
+        update(text);
         nanosleep(&t, NULL);
     }
     return true;
@@ -301,33 +303,30 @@ bool fadeImage(SDL_Texture *text, int rot, bool reverse, long delay)
 
 SDL_Texture *loadImage(char *name)
 {
-    bool mode2d = false;
-    bool success = true;
-    SDL_Surface *image = NULL;
+    // SDL_Surface *image = NULL;
     SDL_Texture *text = NULL;
 
-    if (mode2d == true) {
-        image = IMG_Load(name);
-        if (image == NULL) {
-            slog(ERROR, LOG_CORE, "Unable to load image %s! SDL Error: %s", name, SDL_GetError());
-            return false;
-        }
-        SDL_Surface *optimizedSurface = SDL_ConvertSurface(image, screenSurface->format, 0);
+    // if (mode2d == true) {
+    //     image = IMG_Load(name);
+    //     if (image == NULL) {
+    //         slog(ERROR, LOG_CORE, "Unable to load image %s! SDL Error: %s", name, SDL_GetError());
+    //         return false;
+    //     }
+    //     SDL_Surface *optimizedSurface = SDL_ConvertSurface(image, screenSurface->format, 0);
 
-        if (SDL_BlitScaled(optimizedSurface, NULL, screenSurface, NULL)) {
-            slog(ERROR, LOG_CORE, "Unable to blit image %s! SDL Error: %s", name, SDL_GetError());
-            return false;
-        }
-        SDL_UpdateWindowSurface(window);
-    } else {
-        SDL_Rect rect = {0, 0, 0, 0};
-        text = IMG_LoadTexture(renderer, name);
-        if (text == NULL) {
-            slog(ERROR, LOG_CORE, "Error loading image : %s", IMG_GetError());
-            return false;
-        }
-        SDL_SetTextureBlendMode(text, SDL_BLENDMODE_BLEND);
+    //     if (SDL_BlitScaled(optimizedSurface, NULL, screenSurface, NULL)) {
+    //         slog(ERROR, LOG_CORE, "Unable to blit image %s! SDL Error: %s", name, SDL_GetError());
+    //         return false;
+    //     }
+    //     SDL_UpdateWindowSurface(window);
+    // } else {
+    text = IMG_LoadTexture(renderer, name);
+    if (text == NULL) {
+        slog(ERROR, LOG_CORE, "Error loading image : %s", IMG_GetError());
+        return false;
     }
+    SDL_SetTextureBlendMode(text, SDL_BLENDMODE_BLEND);
+    // }
     return text;
 }
 
@@ -351,8 +350,26 @@ void closeSDL()
     SDL_Quit();
 }
 
-void initTexts(void)
+void initGFX(void)
 {
+#ifdef RASPBERRY
+    bcm_host_init();
+    slog(INFO, LOG_TEXTURE, "Initializing broadcom hardware");
+#endif
+#ifndef DARWIN
+    slog(DEBUG, LOG_TEXTURE, "Enable SDL2 verbose logging");
+    SDL_LogSetAllPriority(SDL_LOG_PRIORITY_VERBOSE);
+#endif
+
+    dumpModes();
+
+    if (!loadSDL()) {
+        slog(ERROR, LOG_CORE, "Failed to initialize SDL. Exit");
+        exit(1);
+    }
+
+    dumpSDLInfo();
+
     int bytes = sizeof(struct texts);
     for (int i = 0; i < TEXT_SLOTS; i++)
     {
@@ -360,7 +377,29 @@ void initTexts(void)
         memset(textFields[i], 0, bytes);
         textFields[i]->active = false;
     }
-    slog(INFO, LOG_CORE, "Initialized %d bytes", bytes * TEXT_SLOTS);
+    bytes = sizeof(struct texture);
+    for (int i = 0; i < 3; i++) {
+        textures[i] = malloc(bytes);
+        memset(textures[i], 0, bytes);
+        textures[i]->active = false;
+    }
+    slog(DEBUG, LOG_CORE, "Initialized %d bytes", bytes * TEXT_SLOTS);
+
+}
+
+void cleanupGFX() {
+    for (int i = 0; i < 3; i++) {
+        if(textures[i]->active) {
+            SDL_DestroyTexture(textures[i]->tex);
+        }
+        free(textures[i]);
+    } 
+    for (int i = 0; i < TEXT_SLOTS; i++)
+    {
+        free(textFields[i]);
+    }
+
+    closeSDL();
 }
 
 void renderTexts(void)
@@ -390,11 +429,11 @@ void clearText(int id) {
     texts *t = textFields[id];
     if (!t->tex)
     {
-        slog(INFO, LOG_CORE, "Freeing old text slot.");
+        slog(DEBUG, LOG_CORE, "Freeing old text slot.");
         SDL_DestroyTexture(t->tex);
         free(t->str);
         t->active = false;
-        update(t1, rot);
+        update(textures[0]->tex);
     }
 }
 
@@ -406,10 +445,10 @@ bool setupText(int id, int x, int y, int size, char *color, long timeout, char *
     t->x = x;
     t->y = y;
 
-    slog(INFO, LOG_CORE, "Setting up text %d(%d,%d, sz %d, color %s) : %s for %d seconds", id, x, y, size, color, str, timeout);
+    slog(DEBUG, LOG_CORE, "Setting up text %d(%d,%d, sz %d, color %s) : %s for %d seconds", id, x, y, size, color, str, timeout);
     if (!t->tex)
     {
-        slog(INFO, LOG_CORE, "Freeing old text slot.");
+        slog(DEBUG, LOG_CORE, "Freeing old text slot.");
         SDL_DestroyTexture(t->tex);
         free(t->str);
     }
@@ -423,7 +462,7 @@ bool setupText(int id, int x, int y, int size, char *color, long timeout, char *
     {
         if (showFont)
             TTF_CloseFont(showFont);
-        slog(INFO, LOG_CORE, "Loading font %s in size %d", BASE "" FONT, size);
+        slog(DEBUG, LOG_CORE, "Loading font %s in size %d", BASE "" FONT, size);
         showFont = loadFont(BASE "" FONT, size);
         if (!showFont)
             return false;
