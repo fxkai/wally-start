@@ -376,6 +376,7 @@ void initGFX(void)
         textFields[i] = malloc(bytes);
         memset(textFields[i], 0, bytes);
         textFields[i]->active = false;
+        textFields[i]->destroy = false;
     }
     bytes = sizeof(struct texture);
     for (int i = 0; i < 3; i++) {
@@ -408,6 +409,10 @@ void renderTexts(void)
     SDL_Rect r = {0, 0, 0, 0};
     for (int i = 0; i < TEXT_SLOTS; i++)
     {
+        if (textFields[i]->destroy){
+            clearText(i);
+            continue;
+        }
         if (textFields[i]->active)
         {
             count++;
@@ -454,7 +459,9 @@ bool setupText(int id, int x, int y, int size, char *color, long timeout, char *
     }
 
     t->active = true;
+    t->destroy = false;
     t->str = str;
+    t->timeout = timeout;
 
     hexToColor(color, &t->color);
 

@@ -38,8 +38,24 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
+    // start a fader thread
+    if (pthread_create(&fader_thr, NULL, &faderThread, NULL) != 0) {
+        slog(ERROR, LOG_CORE, "Failed to create fader thread!");
+        exit(1);
+    }
+
+    // start a timer thread
+    if (pthread_create(&timer_thr, NULL, &timerThread, NULL) != 0) {
+        slog(ERROR, LOG_CORE, "Failed to create timer thread!");
+        exit(1);
+    }
+
     while (!quit && SDL_WaitEvent(&event) != 0) {
         eventLoop = true;
+        if (event.type == SDL_UPD_EVENT) {
+            update(textures[0]->tex);
+            continue;
+        }
         if (event.type == SDL_CMD_EVENT) {
             slog(DEBUG, LOG_CORE, "New CMD event %s.", event.user.data1);
             processCommand(event.user.data1);
@@ -102,6 +118,8 @@ bool processCommand(char *buf)
                 if (file && delay) {
                     textures[0]->tex = loadImage(file);
                     textures[0]->active = true;
+                    textures[0]->fadein = 255;
+                    textures[0]->fadedelay = (struct timespec){0, delay};
                     if (!textures[0]->tex) {
                         slog(ERROR, LOG_CORE, "Failed to load image %s.", file);
                     } else {
@@ -163,13 +181,13 @@ bool processCommand(char *buf)
                 textures[0]->active = false;
             } else if (strcmp(myCmd, "clearlog") == 0) {
                 clearText(0);
-            } else if (strcmp(myCmd, "log") == 0) {
-                setupText(0, 1, h + 6 - ( 2 * logSize), logSize, strdup(color), 0, strdup(cmd + 4));
             } else if (strcmp(myCmd, "run") == 0) {
                 processScript(strdup(cmd + 4));
             } else if (strcmp(myCmd, "cleartext") == 0) {
                 char *idStr = strsep(&lineCopy, " ");
                 clearText(atoi(idStr));
+            } else if (strcmp(myCmd, "log") == 0) {
+                setupText(0, 1, h + 6 - ( 2 * logSize), logSize, strdup(color), 10, strdup(cmd + 4));
             } else if (strcmp(myCmd, "text") == 0) {
                 char *idStr = strsep(&lineCopy, " ");
                 char *xStr = strsep(&lineCopy, " ");
@@ -254,4 +272,46 @@ void *processScript(void *file)
     SDL_PushEvent(&sdlevent);
     free(cmds);
     return (void*)0;
+}
+
+void* faderThread(void *p) {
+    SDL_Event sdlevent;
+    bool skipSleep = false;;
+    while(!quit) {
+        for (int i = 0; i < TEXTURE_SLOTS; i++) {
+            if(textures[i]->fadein > 0) {
+                slog(INFO, LOG_CORE, "Found fadein %d", textures[i]->fadein);
+                textures[i]->fadein -= 1;
+                sdlevent.type = SDL_UPD_EVENT;
+                SDL_PushEvent(&sdlevent);
+                skipSleep = true;
+            }
+        }
+        if(!skipSleep) {
+            sleep(1);
+        } else {
+            skipSleep = false;
+        }
+    }
+    return NULL;
+}
+// TODO : check if thread safety is needed
+void* timerThread(void *p) {
+    SDL_Event sdlevent;
+    while(!quit) {
+        for (int i = 0; i < TEXT_SLOTS; i++) {
+            if(textFields[i]->active && textFields[i]->timeout > 0) {
+                if(textFields[i]->timeout == 1) {
+                    textFields[i]->active = false;
+                    textFields[i]->destroy = true;
+                    slog(INFO, LOG_CORE, "Notified text slot %d to be destroyed", i);
+                    sdlevent.type = SDL_UPD_EVENT;
+                    SDL_PushEvent(&sdlevent);
+                }
+                textFields[i]->timeout -= 1;
+            }
+        }
+        sleep(1);
+    }
+    return NULL;
 }
