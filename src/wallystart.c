@@ -245,7 +245,7 @@ bool processCommand(char *buf)
 void *processScript(void *file)
 {
     while (!eventLoop) 
-        sleep(1);
+        sleep(3);
     SDL_Event sdlevent;
     slog(DEBUG, LOG_CORE, "Reading script : %s", file);
     long fsize = 0;
