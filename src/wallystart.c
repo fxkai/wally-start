@@ -275,10 +275,11 @@ void *processScript(void *file)
 }
 
 void* faderThread(void *p) {
+    int i;
     SDL_Event sdlevent;
     bool skipSleep = false;;
     while(!quit) {
-        for (int i = 0; i < TEXTURE_SLOTS; i++) {
+        for (i = 0; i < TEXTURE_SLOTS; i++) {
             if(textures[i]->fadein > 0) {
                 slog(INFO, LOG_CORE, "Found fadein %d", textures[i]->fadein);
                 textures[i]->fadein -= 1;
@@ -297,9 +298,10 @@ void* faderThread(void *p) {
 }
 // TODO : check if thread safety is needed
 void* timerThread(void *p) {
+    int i;
     SDL_Event sdlevent;
     while(!quit) {
-        for (int i = 0; i < TEXT_SLOTS; i++) {
+        for (i = 0; i < TEXT_SLOTS; i++) {
             if(textFields[i]->active && textFields[i]->timeout > 0) {
                 if(textFields[i]->timeout == 1) {
                     textFields[i]->active = false;
