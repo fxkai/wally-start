@@ -1,8 +1,5 @@
 set(TEST_SRC drmtest.c)
 
-# Remove buildroot flags (such as rdynamic to avoid buggy builds)
-SET(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")
-
 if(${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm")
   set(RPIBCM_LIBS bcm_host)
   set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} ${RPI_C_FLAGS}")
@@ -18,7 +15,7 @@ add_executable(wallyc ${WALLYC_SRC})
 target_link_libraries(wallyc)
 install(TARGETS wallyc DESTINATION ${BIN_INSTALL_DIR})
 
-set(WALLYS wallystart.c slog.c wallylistener.c)
+set(WALLYS wallystart.c slog.c wallylistener.c wallylib.c)
 set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -DWALLYSTART")
 add_executable(wallystart ${WALLYS})
 target_link_libraries(wallystart ${LIBSDL_LIBRARIES} ${LIBSDLIMG_LIBRARIES} ${LIBSDLTTF_LIBRARIES} SDL2_gfx pthread ${RPI_LD_FLAGS} ${RPIBCM_LIBS})

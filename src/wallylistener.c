@@ -10,22 +10,22 @@ void handleCommand(char *str) {
 
     char *oldStr;
     // Handle some basic commands while in startup mode
-    if (startupDone == false) {
-        if (strncmp(str, "quit",4) == 0){
-            kill(getpid(),SIGINT);
-        }
-        if (strncmp(str, "log ",4) == 0){
-            slog(DEBUG, LOG_CORE, "Found log command in startup mode.");
-            // Avoid nullpointer in the other thread
-            oldStr = logStr;
-            logStr = strndup(str+4, strlen(str) - 4);
-            free(str);
-	        if (oldStr) {
-	            free(oldStr);
-	        }
-        }
-        return;
-    }
+    // if (startupDone == false) {
+    //     if (strncmp(str, "quit",4) == 0){
+    //         kill(getpid(),SIGINT);
+    //     }
+    //     if (strncmp(str, "log ",4) == 0){
+    //         slog(DEBUG, LOG_CORE, "Found log command in startup mode.");
+    //         // Avoid nullpointer in the other thread
+    //         oldStr = logStr;
+    //         logStr = strndup(str+4, strlen(str) - 4);
+    //         free(str);
+	   //      if (oldStr) {
+	   //          free(oldStr);
+	   //      }
+    //     }
+    //     return;
+    // }
 
     sdlevent.type = SDL_CMD_EVENT;
     sdlevent.user.data1 = str;
