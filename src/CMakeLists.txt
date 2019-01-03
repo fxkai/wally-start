@@ -19,6 +19,8 @@ set(WALLYS wallystart.c slog.c wallylistener.c wallylib.c)
 set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -DWALLYSTART")
 add_executable(wallystart ${WALLYS})
 target_link_libraries(wallystart ${LIBSDL_LIBRARIES} ${LIBSDLIMG_LIBRARIES} ${LIBSDLTTF_LIBRARIES} SDL2_gfx pthread ${RPI_LD_FLAGS} ${RPIBCM_LIBS})
+# fix for buggy rdynamic flag on gcc
+SET(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS)
 install(TARGETS wallystart DESTINATION ${BIN_INSTALL_DIR})
 
 if(WITH_VIDEO STREQUAL on)

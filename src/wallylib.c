@@ -371,6 +371,7 @@ void closeSDL()
 
 bool initGFX(void)
 {
+    int i;
 #ifdef RASPBERRY
     bcm_host_init();
     slog(INFO, LOG_TEXTURE, "Initializing broadcom hardware");
@@ -390,7 +391,7 @@ bool initGFX(void)
     dumpSDLInfo();
 
     int bytes = sizeof(struct texts);
-    for (int i = 0; i < TEXT_SLOTS; i++)
+    for (i = 0; i < TEXT_SLOTS; i++)
     {
         textFields[i] = malloc(bytes);
         memset(textFields[i], 0, bytes);
@@ -398,7 +399,7 @@ bool initGFX(void)
         textFields[i]->destroy = false;
     }
     bytes = sizeof(struct texture);
-    for (int i = 0; i < 3; i++) {
+    for (i = 0; i < 3; i++) {
         textures[i] = malloc(bytes);
         memset(textures[i], 0, bytes);
         textures[i]->active = false;
@@ -409,13 +410,14 @@ bool initGFX(void)
 }
 
 void cleanupGFX() {
-    for (int i = 0; i < 3; i++) {
+    int i;
+    for (i = 0; i < 3; i++) {
         if(textures[i]->active) {
             SDL_DestroyTexture(textures[i]->tex);
         }
         free(textures[i]);
     } 
-    for (int i = 0; i < TEXT_SLOTS; i++)
+    for (i = 0; i < TEXT_SLOTS; i++)
     {
         free(textFields[i]);
     }
@@ -426,8 +428,9 @@ void cleanupGFX() {
 void renderTexts(void)
 {
     int count = 0;
+    int i;
     SDL_Rect r = {0, 0, 0, 0};
-    for (int i = 0; i < TEXT_SLOTS; i++)
+    for (i = 0; i < TEXT_SLOTS; i++)
     {
         if (textFields[i]->destroy){
             clearText(i);
