@@ -30,7 +30,8 @@
 #define SDL_UPD_EVENT    (SDL_USEREVENT + 4)
 
 int EventFilter(void *userdata, SDL_Event *event);
-void initGFX(void);
+bool initGFX(void);
+bool initThreads(void *p);
 void cleanupGFX();
 void renderTexts(void);
 bool setupText(int id, int x, int y, int size, char *color, long timeout, char *str);

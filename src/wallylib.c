@@ -301,6 +301,25 @@ bool fadeImage(SDL_Texture *text, bool reverse, long delay)
     return true;
 }
 
+bool fadeImageEx(SDL_Texture *text, bool reverse, long delay)
+{
+    struct timespec t = {0, delay};
+    int v = 0;
+    int i = 0;
+    for (i = 0; i < 255; i += 2) {
+        if (reverse) {
+            v = 255 - i;
+        } else {
+            v = i;
+        }
+        SDL_SetTextureColorMod(text, v, v, v);
+        update(text);
+        nanosleep(&t, NULL);
+    }
+    return true;
+}
+
+
 SDL_Texture *loadImage(char *name)
 {
     // SDL_Surface *image = NULL;
@@ -350,7 +369,7 @@ void closeSDL()
     SDL_Quit();
 }
 
-void initGFX(void)
+bool initGFX(void)
 {
 #ifdef RASPBERRY
     bcm_host_init();
@@ -365,7 +384,7 @@ void initGFX(void)
 
     if (!loadSDL()) {
         slog(ERROR, LOG_CORE, "Failed to initialize SDL. Exit");
-        exit(1);
+        return false;
     }
 
     dumpSDLInfo();
@@ -386,6 +405,7 @@ void initGFX(void)
     }
     slog(DEBUG, LOG_CORE, "Initialized %d bytes", bytes * TEXT_SLOTS);
 
+    return true;
 }
 
 void cleanupGFX() {

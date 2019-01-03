@@ -20,35 +20,15 @@ int main(int argc, char *argv[])
         start = argv[1];
     }
 
-    initGFX();
+    if(!initGFX())
+        exit(1);
+
     slog(INFO, LOG_CORE, "Screen size : %dx%d", w, h);
 
-    // preFilter all Window events
     SDL_SetEventFilter(EventFilter, NULL);
 
-    // create TCP listener
-    if (pthread_create(&log_thr, NULL, &logListener, NULL) != 0) {
-        slog(ERROR, LOG_CORE, "Failed to create listener thread!");
+    if(!initThreads(start))
         exit(1);
-    }
-
-    // detach startup script reader
-    if (pthread_create(&startup_thr, NULL, &processScript, start) != 0) {
-        slog(ERROR, LOG_CORE, "Failed to create startup scipt thread!");
-        exit(1);
-    }
-
-    // start a fader thread
-    if (pthread_create(&fader_thr, NULL, &faderThread, NULL) != 0) {
-        slog(ERROR, LOG_CORE, "Failed to create fader thread!");
-        exit(1);
-    }
-
-    // start a timer thread
-    if (pthread_create(&timer_thr, NULL, &timerThread, NULL) != 0) {
-        slog(ERROR, LOG_CORE, "Failed to create timer thread!");
-        exit(1);
-    }
 
     while (!quit && SDL_WaitEvent(&event) != 0) {
         eventLoop = true;
@@ -69,6 +49,34 @@ int main(int argc, char *argv[])
     cleanupGFX();
 
     return 0;
+}
+
+bool initThreads(void *start){
+    // create TCP listener
+    if (pthread_create(&log_thr, NULL, &logListener, NULL) != 0) {
+        slog(ERROR, LOG_CORE, "Failed to create listener thread!");
+        return false;
+    }
+
+    // detach startup script reader
+    if (pthread_create(&startup_thr, NULL, &processScript, start) != 0) {
+        slog(ERROR, LOG_CORE, "Failed to create startup scipt thread!");
+        return false;
+    }
+
+    // start a fader thread
+    if (pthread_create(&fader_thr, NULL, &faderThread, NULL) != 0) {
+        slog(ERROR, LOG_CORE, "Failed to create fader thread!");
+        return false;
+    }
+
+    // start a timer thread
+    if (pthread_create(&timer_thr, NULL, &timerThread, NULL) != 0) {
+        slog(ERROR, LOG_CORE, "Failed to create timer thread!");
+        return false;
+    }
+
+    return true;
 }
 
 bool update(SDL_Texture *tex)
@@ -280,7 +288,7 @@ void* faderThread(void *p) {
     while(!quit) {
         for (int i = 0; i < TEXTURE_SLOTS; i++) {
             if(textures[i]->fadein > 0) {
-                slog(INFO, LOG_CORE, "Found fadein %d", textures[i]->fadein);
+                slog(DEBUG, LOG_CORE, "Found fadein %d", textures[i]->fadein);
                 textures[i]->fadein -= 1;
                 sdlevent.type = SDL_UPD_EVENT;
                 SDL_PushEvent(&sdlevent);
