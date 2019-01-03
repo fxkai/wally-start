@@ -26,22 +26,19 @@
 #define BASE "."
 #define FONT "/etc/wallyd.d/fonts/Cairo-Regular.ttf"
 #define START WALLYD_CONFDIR"/wallystart.conf"
-#define SDL_CMD_EVENT    (SDL_USEREVENT + 3)
-#define SDL_UPD_EVENT    (SDL_USEREVENT + 4)
+// #define SDL_CMD_EVENT    (SDL_USEREVENT + 3)
+// #define SDL_UPD_EVENT    (SDL_USEREVENT + 4)
 
 int EventFilter(void *userdata, SDL_Event *event);
 bool initGFX(void);
-bool initThreads(void *p);
+bool initThreadsAndHandlers(void *p);
 void cleanupGFX();
 void renderTexts(void);
 bool setupText(int id, int x, int y, int size, char *color, long timeout, char *str);
-bool loadSDL();
-bool dumpSDLInfo();
 TTF_Font *loadFont(char *file, int size);
-bool update(SDL_Texture *tex);
+bool update(int id);
 SDL_Texture* loadImage(char *name);
 void closeSDL();
-bool dumpModes(void);
 SDL_Texture* renderLog(char *strTmp,int *w, int *h);
 bool processCommand(char *buf);
 char *repl_str(const char *str, const char *from, const char *to);
@@ -50,14 +47,17 @@ void sig_handler(int);
 SDL_Texture* renderText(char *, int, char *, int *, int *);
 int getNumOrPercentEx(char *str, int relativeTo, int *value, int base);
 bool fadeImage(SDL_Texture *text, bool reverse, long delay);
-bool fadeOver(SDL_Texture *to, SDL_Texture *from, long delay);
+SDL_Texture *fadeOver(SDL_Texture *to, SDL_Texture *from, SDL_Texture *temp, int step);
 void clearText(int id);
+void copyTexture(int from, int to);
+void destroyTexture(int id);
+void resetTexture(int id);
 
 // Threads
-void* logListener(void *);
-void* processScript(void *file);
-void* timerThread(void *p);
-void* faderThread(void *p);
+void *processScript(void*);
+void *logListener(void *);
+void *faderThread(void *);
+void *timerThread(void *);
 
 typedef struct texture {
   int x;
@@ -70,7 +70,11 @@ typedef struct texture {
   bool active;
   int fadein;
   int fadeout;
-  struct timespec fadedelay;
+  int fadeover;
+  int fadesrc;
+  bool dirty;
+  // struct timespec fadedelay;
+  long delay;
 } texture;
 
 typedef struct texts {
@@ -86,6 +90,7 @@ typedef struct texts {
   long timeout;
   bool active;
   bool destroy;
+  bool dirty;
 } texts;
 
 #ifdef WALLYSTART_VARS
@@ -112,10 +117,11 @@ char *showText = NULL;
 int showFontSize = 0;
 int errno;
 
-pthread_t log_thr;
-pthread_t startup_thr;
-pthread_t timer_thr;
-pthread_t fader_thr;
+Uint32 SDL_CMD_EVENT = 0;
+Uint32 SDL_UPD_EVENT = 0;
+Uint32 SDL_ALLOC_EVENT = 0;
+Uint32 SDL_DESTROY_EVENT = 0;
+Uint32 SDL_LOADIMAGE_EVENT = 0;
 
 struct texts *textFields[TEXT_SLOTS];
 struct texture *textures[2];
@@ -135,6 +141,11 @@ extern int showFontSize;
 extern struct texts *textFields[TEXT_SLOTS];
 extern struct texture *textures[TEXTURE_SLOTS];
 extern int errno;
+extern Uint32 SDL_CMD_EVENT;
+extern Uint32 SDL_UPD_EVENT;
+extern Uint32 SDL_ALLOC_EVENT;
+extern Uint32 SDL_DESTROY_EVENT;
+extern Uint32 SDL_LOADIMAGE_EVENT;
 #endif // WALLYSTART_VARS
 
 #endif

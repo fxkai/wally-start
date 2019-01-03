@@ -1,5 +1,10 @@
 #include "wallystart.h"
 
+pthread_t log_thr;
+pthread_t startup_thr;
+pthread_t timer_thr;
+pthread_t fader_thr;
+
 void PrintEvent(const SDL_Event *event)
 {
     if (event->type == SDL_WINDOWEVENT)
@@ -258,48 +263,45 @@ bool loadSDL()
 
     SDL_GetRendererOutputSize(renderer, &w, &h);
 
+    // Temp texture
+    textures[2]->tex = SDL_CreateTexture(renderer, 
+        SDL_PIXELFORMAT_RGBA8888, 
+        SDL_TEXTUREACCESS_TARGET, 
+        w, 
+        h);
     return true;
 }
 
-bool fadeOver(SDL_Texture *t1, SDL_Texture *t2, long delay)
+SDL_Texture *fadeOver(SDL_Texture *src, SDL_Texture *dest, SDL_Texture *temp, int step)
 {
-    struct timespec t = {0, delay};
-    int i = 0;
-    SDL_Texture *temp = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, w, h);
-    SDL_SetTextureBlendMode(t1, SDL_BLENDMODE_BLEND);
-    SDL_SetTextureBlendMode(t2, SDL_BLENDMODE_BLEND);
-    for (i = 255; i >= 0; i -= 4)
-    {
-        SDL_SetRenderTarget(renderer, temp);
-        SDL_RenderCopyEx(renderer, t2, NULL, NULL, rot, NULL, SDL_FLIP_NONE);
-        SDL_SetTextureAlphaMod(t1, i);
-        SDL_RenderCopyEx(renderer, t1, NULL, NULL, rot, NULL, SDL_FLIP_NONE);
-        SDL_SetRenderTarget(renderer, NULL);
-        update(temp);
-        nanosleep(&t, NULL);
-    }
-    SDL_DestroyTexture(temp);
-    SDL_SetTextureAlphaMod(t1, 255);
-    return true;
+    SDL_SetTextureBlendMode(src, SDL_BLENDMODE_BLEND);
+    SDL_SetTextureBlendMode(dest, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderTarget(renderer, temp);
+    SDL_RenderCopyEx(renderer, dest, NULL, NULL, rot, NULL, SDL_FLIP_NONE);
+    SDL_SetTextureAlphaMod(src, step);
+    SDL_RenderCopyEx(renderer, src, NULL, NULL, rot, NULL, SDL_FLIP_NONE);
+    SDL_SetRenderTarget(renderer, NULL);
+
+    return temp;
 }
 
-bool fadeImage(SDL_Texture *text, bool reverse, long delay)
-{
-    struct timespec t = {0, delay};
-    int v = 0;
-    int i = 0;
-    for (i = 0; i < 255; i += 2) {
-        if (reverse) {
-            v = 255 - i;
-        } else {
-            v = i;
-        }
-        SDL_SetTextureColorMod(text, v, v, v);
-        update(text);
-        nanosleep(&t, NULL);
-    }
-    return true;
-}
+// bool fadeImage(SDL_Texture *text, bool reverse, long delay)
+// {
+//     struct timespec t = {0, delay};
+//     int v = 0;
+//     int i = 0;
+//     for (i = 0; i < 255; i += 2) {
+//         if (reverse) {
+//             v = 255 - i;
+//         } else {
+//             v = i;
+//         }
+//         SDL_SetTextureColorMod(text, v, v, v);
+//         update(text);
+//         nanosleep(&t, NULL);
+//     }
+//     return true;
+// }
 
 bool fadeImageEx(SDL_Texture *text, bool reverse, long delay)
 {
@@ -381,15 +383,6 @@ bool initGFX(void)
     SDL_LogSetAllPriority(SDL_LOG_PRIORITY_VERBOSE);
 #endif
 
-    dumpModes();
-
-    if (!loadSDL()) {
-        slog(ERROR, LOG_CORE, "Failed to initialize SDL. Exit");
-        return false;
-    }
-
-    dumpSDLInfo();
-
     int bytes = sizeof(struct texts);
     for (i = 0; i < TEXT_SLOTS; i++)
     {
@@ -406,14 +399,31 @@ bool initGFX(void)
     }
     slog(DEBUG, LOG_CORE, "Initialized %d bytes", bytes * TEXT_SLOTS);
 
+    dumpModes();
+
+    if (!loadSDL()) {
+        slog(ERROR, LOG_CORE, "Failed to initialize SDL. Exit");
+        return false;
+    }
+
+    dumpSDLInfo();
+
+    slog(INFO, LOG_CORE, "Screen size : %dx%d", w, h);
+
+    SDL_UPD_EVENT = SDL_RegisterEvents(1);
+    SDL_CMD_EVENT = SDL_RegisterEvents(1);
+    SDL_ALLOC_EVENT = SDL_RegisterEvents(1);
+    SDL_DESTROY_EVENT = SDL_RegisterEvents(1);
+    SDL_LOADIMAGE_EVENT = SDL_RegisterEvents(1);
+
     return true;
 }
 
 void cleanupGFX() {
     int i;
     for (i = 0; i < 3; i++) {
-        if(textures[i]->active) {
-            SDL_DestroyTexture(textures[i]->tex);
+        if(textures[i]->tex) {
+            destroyTexture(i);
         }
         free(textures[i]);
     } 
@@ -453,6 +463,31 @@ void renderTexts(void)
     }
 }
 
+void copyTexture(int from, int to) {
+    texture *f = textures[from];
+    texture *t = textures[to];
+    memcpy(t, f, sizeof(struct texture));
+}
+
+// Reset texture structure to defaults
+void resetTexture(int id) {
+    SDL_Texture *t = textures[id]->tex;
+    memset(textures[id], 0, sizeof(struct texture));
+    textures[id]->active = false;
+    textures[id]->tex = t;
+}
+
+void destroyTexture(int id) {
+    texture *t = textures[id];
+    if (t->tex)
+    {
+        slog(DEBUG, LOG_CORE, "Freeing old tex.");
+        SDL_DestroyTexture(t->tex);
+        t->active = false;
+        update(-1);
+    }
+}
+
 void clearText(int id) {
     texts *t = textFields[id];
     if (!t->tex)
@@ -461,7 +496,7 @@ void clearText(int id) {
         SDL_DestroyTexture(t->tex);
         free(t->str);
         t->active = false;
-        update(textures[0]->tex);
+        update(0);
     }
 }
 
@@ -517,6 +552,35 @@ void sig_handler(int signo)
         quit = true;
         exit(1);
     }
+}
+
+bool initThreadsAndHandlers(void *start){
+    if (signal(SIGINT, sig_handler) == SIG_ERR) {
+        slog(ERROR, LOG_CORE, "Could not catch signal.");
+        return false;
+    }
+    // create TCP listener
+    if (pthread_create(&log_thr, NULL, &logListener, NULL) != 0) {
+        slog(ERROR, LOG_CORE, "Failed to create listener thread!");
+        return false;
+    }
+    // detach startup script reader
+    if (pthread_create(&startup_thr, NULL, &processScript, start) != 0) {
+        slog(ERROR, LOG_CORE, "Failed to create startup scipt thread!");
+        return false;
+    }
+    // start a fader thread
+    if (pthread_create(&fader_thr, NULL, &faderThread, NULL) != 0) {
+        slog(ERROR, LOG_CORE, "Failed to create fader thread!");
+        return false;
+    }
+    // start a timer thread
+    if (pthread_create(&timer_thr, NULL, &timerThread, NULL) != 0) {
+        slog(ERROR, LOG_CORE, "Failed to create timer thread!");
+        return false;
+    }
+
+    return true;
 }
 
 void hexToColor(char *colStr, SDL_Color *c)
