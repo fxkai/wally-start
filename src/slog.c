@@ -39,6 +39,8 @@
 static SlogFlags slg;
 //static pthread_mutex_t slog_mutex;
 
+extern void* globalSLG;
+
 #ifdef WITHOUT_CLOCK_GETTIME
 static inline int clock_gettime(int clock_id, struct timespec *ts)
 {
@@ -284,11 +286,8 @@ char* slog_get_short(SlogDate *pDate, char *msg, ...)
  */
 void eslog(const char *_srcfile, int line, int level, int flag, const char *msg, ...)
 {
-#ifndef WALLYSTART
-    SlogFlags *slg = ph->slg;
-#else
     SlogFlags *slg = globalSLG;
-#endif
+
     char *srcfile, *file = strdup(_srcfile);
     if(strrchr(file,'/')){
         srcfile = strrchr(file,'/') + 1;
@@ -474,11 +473,7 @@ void slog_init(const char* fname, const char* conf, int lvl, int flvl, int mask,
     }
 
     // Save globally
-#ifndef WALLYSTART
-    ph->slg = &slg;
-#else
     globalSLG = &slg;
-#endif
 
     /* Handle config parser status */
     //if (!status) slog(WARN, LOG_UTIL, "Initializing logger values without config");

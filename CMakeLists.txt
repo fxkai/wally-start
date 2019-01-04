@@ -19,6 +19,8 @@ set(MULTITHREADED_BUILD 1)
 
 set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -DLINUX -DWALLYSTART")
 
+set(CMAKE_BUILD_TYPE RelWithDebInfo)
+
 find_package(PkgConfig)
 pkg_check_modules(LIBSDL sdl2>=2.0)
 pkg_check_modules(LIBSDLTTF SDL2_ttf>=2.0)

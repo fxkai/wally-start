@@ -15,6 +15,8 @@ add_executable(wallyc ${WALLYC_SRC})
 target_link_libraries(wallyc)
 install(TARGETS wallyc DESTINATION ${BIN_INSTALL_DIR})
 
+set(CMAKE_BUILD_TYPE Debug)
+
 set(WALLYS wallystart.c slog.c wallylistener.c wallylib.c)
 set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -DWALLYSTART")
 add_executable(wallystart ${WALLYS})

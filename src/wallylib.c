@@ -1,4 +1,4 @@
-#include "wallystart.h"
+#include "wally.h"
 
 pthread_t log_thr;
 pthread_t startup_thr;
@@ -303,23 +303,23 @@ SDL_Texture *fadeOver(SDL_Texture *src, SDL_Texture *dest, SDL_Texture *temp, in
 //     return true;
 // }
 
-bool fadeImageEx(SDL_Texture *text, bool reverse, long delay)
-{
-    struct timespec t = {0, delay};
-    int v = 0;
-    int i = 0;
-    for (i = 0; i < 255; i += 2) {
-        if (reverse) {
-            v = 255 - i;
-        } else {
-            v = i;
-        }
-        SDL_SetTextureColorMod(text, v, v, v);
-        update(text);
-        nanosleep(&t, NULL);
-    }
-    return true;
-}
+// bool fadeImageEx(SDL_Texture *text, bool reverse, long delay)
+// {
+//     struct timespec t = {0, delay};
+//     int v = 0;
+//     int i = 0;
+//     for (i = 0; i < 255; i += 2) {
+//         if (reverse) {
+//             v = 255 - i;
+//         } else {
+//             v = i;
+//         }
+//         SDL_SetTextureColorMod(text, v, v, v);
+//         update(text);
+//         nanosleep(&t, NULL);
+//     }
+//     return true;
+// }
 
 
 SDL_Texture *loadImage(char *name)
@@ -392,10 +392,11 @@ bool initGFX(void)
         textFields[i]->destroy = false;
     }
     bytes = sizeof(struct texture);
-    for (i = 0; i < 3; i++) {
+    for (i = 0; i < TEXTURE_SLOTS; i++) {
         textures[i] = malloc(bytes);
         memset(textures[i], 0, bytes);
         textures[i]->active = false;
+        textFields[i]->destroy = false;
     }
     slog(DEBUG, LOG_CORE, "Initialized %d bytes", bytes * TEXT_SLOTS);
 
@@ -411,17 +412,22 @@ bool initGFX(void)
     slog(INFO, LOG_CORE, "Screen size : %dx%d", w, h);
 
     SDL_UPD_EVENT = SDL_RegisterEvents(1);
-    SDL_CMD_EVENT = SDL_RegisterEvents(1);
+    slog(DEBUG, LOG_CORE, "SDL_UPD_EVENT : %d", SDL_UPD_EVENT);
     SDL_ALLOC_EVENT = SDL_RegisterEvents(1);
+    slog(DEBUG, LOG_CORE, "SDL_ALLOC_EVENT : %d", SDL_ALLOC_EVENT);
     SDL_DESTROY_EVENT = SDL_RegisterEvents(1);
+    slog(DEBUG, LOG_CORE, "SDL_DESTROY_EVENT : %d", SDL_DESTROY_EVENT);
+//    SDL_CMD_EVENT = SDL_RegisterEvents(1);
+//    slog(DEBUG, LOG_CORE, "SDL_CMD_EVENT : %d", SDL_CMD_EVENT);
     SDL_LOADIMAGE_EVENT = SDL_RegisterEvents(1);
+    slog(DEBUG, LOG_CORE, "SDL_LOADIMAGE_EVENT : %d", SDL_LOADIMAGE_EVENT);
 
     return true;
 }
 
 void cleanupGFX() {
     int i;
-    for (i = 0; i < 3; i++) {
+    for (i = 0; i < TEXTURE_SLOTS; i++) {
         if(textures[i]->tex) {
             destroyTexture(i);
         }
@@ -490,11 +496,15 @@ void destroyTexture(int id) {
 
 void clearText(int id) {
     texts *t = textFields[id];
-    if (!t->tex)
+    if (t->tex)
     {
         slog(DEBUG, LOG_CORE, "Freeing old text slot.");
         SDL_DestroyTexture(t->tex);
-        free(t->str);
+        t->tex = NULL;
+        if(t->str) {
+            free(t->str);
+            t->str = 0;
+        }
         t->active = false;
         update(0);
     }
@@ -509,14 +519,19 @@ bool setupText(int id, int x, int y, int size, char *color, long timeout, char *
     t->y = y;
 
     slog(DEBUG, LOG_CORE, "Setting up text %d(%d,%d, sz %d, color %s) : %s for %d seconds", id, x, y, size, color, str, timeout);
-    if (!t->tex)
+    if (t->tex)
     {
         slog(DEBUG, LOG_CORE, "Freeing old text slot.");
         SDL_DestroyTexture(t->tex);
-        free(t->str);
+        t->tex = NULL;
+        if(t->str) {
+            free(t->str);
+            t->str = NULL;
+        }
     }
 
     t->active = true;
+    t->dirty = true;
     t->destroy = false;
     t->str = str;
     t->timeout = timeout;
@@ -559,7 +574,8 @@ bool initThreadsAndHandlers(void *start){
         slog(ERROR, LOG_CORE, "Could not catch signal.");
         return false;
     }
-    // create TCP listener
+
+    // this is waiting to be joined by startup_thr after bind
     if (pthread_create(&log_thr, NULL, &logListener, NULL) != 0) {
         slog(ERROR, LOG_CORE, "Failed to create listener thread!");
         return false;

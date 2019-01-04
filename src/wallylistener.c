@@ -1,105 +1,74 @@
-#include <wallylistener.h>
-
-#ifndef WALLYPIXEL
-extern bool startupDone;
-extern char *logStr;
-extern char *cmdStr;
-
-void handleCommand(char *str) {
-    SDL_Event sdlevent;
-
-    char *oldStr;
-    // Handle some basic commands while in startup mode
-    // if (startupDone == false) {
-    //     if (strncmp(str, "quit",4) == 0){
-    //         kill(getpid(),SIGINT);
-    //     }
-    //     if (strncmp(str, "log ",4) == 0){
-    //         slog(DEBUG, LOG_CORE, "Found log command in startup mode.");
-    //         // Avoid nullpointer in the other thread
-    //         oldStr = logStr;
-    //         logStr = strndup(str+4, strlen(str) - 4);
-    //         free(str);
-	   //      if (oldStr) {
-	   //          free(oldStr);
-	   //      }
-    //     }
-    //     return;
-    // }
-
-    sdlevent.type = SDL_CMD_EVENT;
-    sdlevent.user.data1 = str;
-    SDL_PushEvent(&sdlevent);
-}
-#endif
+#include <wally.h>
 
 void* logListener(void *ptr){
-   int i = 0;
-   int sockfd, newsockfd;
-   socklen_t clilen;
-   struct sockaddr_in serv_addr, cli_addr;
-   int  n;
-   char *buf;
-   char *oldStr = NULL;
-   char *tmpStr = NULL;
-   int optval = 1;
-   
-   /* First call to socket() function */
-   sockfd = socket(AF_INET, SOCK_STREAM, 0);
-   
-   if (sockfd < 0) {
-      perror("ERROR opening socket");
-      exit(1);
-   }
-   
-   /* Initialize socket structure */
-   bzero((char *) &serv_addr, sizeof(serv_addr));
-   
-   serv_addr.sin_family = AF_INET;
-   serv_addr.sin_addr.s_addr = INADDR_ANY;
-   serv_addr.sin_port = htons(bindPort);
+    slog(DEBUG, LOG_CORE, "Starting command listener on port %d", bindPort);
+    int sockfd, newsockfd;
+    socklen_t clilen;
+    struct sockaddr_in serv_addr, cli_addr;
+    int n;
+    char *buf;
+    int optval = 1;
 
-   setsockopt(sockfd, SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval));
-   
-   /* Now bind the host address using bind() call.*/
-   if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
-      perror("ERROR on binding");
-      exit(1);
-   }
-      
-   listen(sockfd,5);
-   clilen = sizeof(cli_addr);
-   
-   while (1) {
-       newsockfd = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
-       if (newsockfd < 0) {
-           perror("ERROR on accept");
-           return NULL;
-       }
-  
-       while ( 1 ) {
-	       n = sgetline(newsockfd, &buf);
-           //bzero(buffer,256);
-           //n = read( newsockfd,buffer,255 );
-           
-           if (n < 0) {
-              close(newsockfd);
-              break;
-           }
-           // n = write(newsockfd,buf,n);
-	       if(answer == NULL) {
-	          write(newsockfd, buf, n);
-	       } else {
-	          write(newsockfd, answer, strlen(answer));
-	       }
+    /* First call to socket() function */
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+
+    if (sockfd < 0) {
+        perror("ERROR opening socket.");
+        return NULL;
+    }
+
+    /* Initialize socket structure */
+    bzero((char *)&serv_addr, sizeof(serv_addr));
+
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = INADDR_ANY;
+    serv_addr.sin_port = htons(bindPort);
+
+    setsockopt(sockfd, SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval));
+
+    /* Now bind the host address using bind() call.*/
+    if (bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+        perror("Error binding on port.");
+        return NULL;
+    }
+
+    listen(sockfd, 5);
+    clilen = sizeof(cli_addr);
+
+    slog(DEBUG, LOG_CORE, "Waiting for start script thread to join.");
+    pthread_join(startup_thr, NULL);
+    slog(DEBUG, LOG_CORE, "Start script thread joined.");
+
+    while (1) {
+        newsockfd = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
+        slog(TRACE, LOG_CORE, "Client connected.");
+        if (newsockfd < 0) {
+            perror("ERROR on accept");
+            return NULL;
+        }
+
+        while (1) {
+            n = sgetline(newsockfd, &buf);
+
+            //bzero(buffer,256);
+            //n = read( newsockfd,buffer,255 );
+
+            if (n < 0) {
+                close(newsockfd);
+                break;
+            }
+            if (answer == NULL) {
+                write(newsockfd, buf, n);
+            } else {
+                write(newsockfd, answer, strlen(answer));
+            }
             
 #ifndef WALLYPIXEL
-           handleCommand(strndup(buf,n-1));
+           processCommand(strndup(buf,n-1));
 #else
            logStr = strndup(buf,n-1);
 #endif
            free(buf);
-
            close(newsockfd);
            break;
        }
@@ -116,18 +85,15 @@ int sgetline(int fd, char ** out)
     char *buf = malloc(buf_size);
     char *newbuf;
 
-    if (NULL == buf){
+    if (NULL == buf)
         return -1;
-    }
 
     bzero(buf,buf_size);
 
-    while ( 1 )
-    {
+    while ( 1 ) {
         // read a single byte
         ret = read(fd, &chr, 1);
-        if (ret < 1)
-        {
+        if (ret < 1) {
             // error or disconnect
             free(buf);
             return -1;
@@ -141,17 +107,14 @@ int sgetline(int fd, char ** out)
             break; // yes
 
         // is more memory needed?
-        if (bytesloaded >= buf_size)
-        {
+        if (bytesloaded >= buf_size) {
             buf_size += 128;
             newbuf = realloc(buf, buf_size);
 
-            if (NULL == newbuf)
-            {
+            if (NULL == newbuf) {
                 free(buf);
                 return -1;
             }
-
             buf = newbuf;
         }
     }
