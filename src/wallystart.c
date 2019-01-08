@@ -145,15 +145,17 @@ void* faderThread(void *p) {
                 usleep(textures[i]->delay);
             }
 
-            if(textures[i]->fadeloop > 0 && textures[i]->fadeover == 0) {
-                    slog(DEBUG,LOG_CORE, "toggle fadeloop (%d)");
-                    textures[i]->fadeloop -= 1;
-                    int src = textures[i]->fadesrc;
-                    textures[src]->fadeover = 255;
-                    textures[src]->fadeloop = textures[i]->fadeloop;
-                    textures[src]->fadesrc = i;
-                    resetTexture(i);
-                    blockCommands = true;
+            if(textures[i]->fadeloop > 0 && textures[i]->fadeover < 2) {
+                slog(DEBUG,LOG_CORE, "toggle fadeloop %d (%d)",i, textures[i]->fadeloop);
+                int src = textures[i]->fadesrc;
+                textures[src]->fadeover = 255;
+                textures[src]->fadeloop = textures[i]->fadeloop - 1;
+                textures[src]->fadesrc = i;
+                textures[src]->active = true;
+                textures[src]->delay = textures[i]->delay;
+                resetTexture(i);
+                blockCommands = true;
+                continue;
             }
             // Finish fadeover
             if(textures[i]->fadeover == 1) {
@@ -291,7 +293,7 @@ bool processCommand(char *buf)
                 char *fileB = strsep(&lineCopy, " ");
                 long delay = atol(delayStr);
                 long loop = atol(loopStr);
-                slog(DEBUG, LOG_CORE, "Fadeloop %d times from  %s to %s with delay %u", loop, fileA, fileB, delay);
+                slog(DEBUG, LOG_CORE, "Fadeloop %d times from %s to %s with delay %u", loop, fileA, fileB, delay);
                 if (fileA && fileB && loop && delay) {
                     sdlevent.type = SDL_LOADIMAGE_EVENT;
                     sdlevent.user.code = 0;
@@ -301,7 +303,8 @@ bool processCommand(char *buf)
                     sdlevent.user.code = 1;
                     sdlevent.user.data1 = strdup(fileB);
                     SDL_PushEvent(&sdlevent);
-                    textures[0]->fadeloop = loop;
+                    textures[0]->fadeloop = 2 * loop;
+                    textures[0]->fadeover = 255;
                     textures[0]->fadesrc = 1;
                     textures[0]->delay = delay;
                     textures[0]->active = true;
