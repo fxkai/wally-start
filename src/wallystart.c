@@ -26,8 +26,8 @@ int main(int argc, char *argv[])
         eventLoop = true;
         if (event.type == SDL_UPD_EVENT) {
             // keep the queue short
-            updateCounter++;
-            if(updateCounter % 3)
+            //updateCounter++;
+            //if(updateCounter % 3)
                 SDL_FlushEvent(SDL_UPD_EVENT);
             update(event.user.code);
             continue;
@@ -156,7 +156,7 @@ void* faderThread(void *p) {
                 textures[src]->delay = textures[i]->delay;
                 resetTexture(i);
                 blockCommands = true;
-                continue;
+                skipSleep = true;
             }
             // Finish fadeover
             if(textures[i]->fadeover == 1) {
@@ -195,7 +195,7 @@ void* faderThread(void *p) {
  
         }
         if(!skipSleep)
-            sleep(1);
+            usleep(100000);
         else
             skipSleep = false;
     }
@@ -297,13 +297,13 @@ bool processCommand(char *buf)
                 if (fileA && fileB && loop && delay) {
                     sdlevent.type = SDL_LOADIMAGE_EVENT;
                     sdlevent.user.code = 0;
-                    sdlevent.user.data1 = strdup(fileA);
+                    sdlevent.user.data1 = strdup(fileB);
                     SDL_PushEvent(&sdlevent);
                     sdlevent.type = SDL_LOADIMAGE_EVENT;
                     sdlevent.user.code = 1;
-                    sdlevent.user.data1 = strdup(fileB);
+                    sdlevent.user.data1 = strdup(fileA);
                     SDL_PushEvent(&sdlevent);
-                    textures[0]->fadeloop = 2 * loop;
+                    textures[0]->fadeloop = loop;
                     textures[0]->fadeover = 255;
                     textures[0]->fadesrc = 1;
                     textures[0]->delay = delay;
